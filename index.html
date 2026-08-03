@@ -131,13 +131,17 @@
   .mode-btn[data-mode="income"].on{ color:var(--pos); }
 
   .list{ display:flex; flex-direction:column; border:1px solid var(--line-soft); border-radius:14px; overflow:hidden; background:var(--surface); }
-  .row{ display:flex; align-items:center; gap:10px; padding:11px 13px; border-bottom:1px solid var(--line-soft); font-size:12.5px; cursor:pointer; transition:background 150ms var(--ease-out); }
+  .row{ display:flex; align-items:center; gap:9px; padding:11px 13px; border-bottom:1px solid var(--line-soft); font-size:12.5px; transition:background 150ms var(--ease-out); }
   .row:hover{ background:var(--surface-2); }
   .row:last-child{ border-bottom:none; }
   .row .cat-dot{ width:8px; height:8px; border-radius:2.5px; flex:none; }
   .row .date{ color:var(--muted-2); width:34px; flex:none; }
   .row .name{ flex:1; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .row .amt{ font-weight:600; }
+  .row .amt{ font-weight:600; flex:none; }
+  .row .rt{ display:flex; gap:8px; flex:none; margin-left:2px; }
+  .row .rt span{ color:var(--muted-2); font-size:10.5px; cursor:pointer; white-space:nowrap; }
+  .row .rt .edit:hover{ color:var(--accent-ink); }
+  .row .rt .del:hover{ color:var(--over); }
   .list-empty{ padding:24px 12px; text-align:center; font-size:12.5px; color:var(--muted-2); }
 
   .fab{
@@ -345,6 +349,7 @@ var today = new Date();
 var viewMonth = ym(today);
 var activeFilter = 'all';
 var entryMode = 'expense';
+var editingId = null; // null이면 새 항목 추가, 값이 있으면 해당 id의 항목을 수정 중
 var selectedCat = null;
 var selectedSub = null;
 
@@ -641,21 +646,23 @@ function expenseRowHtml(e){
   if(idx < 0) idx = 0;
   var color = catColor(label, isFixed, idx);
   var d = e.date.split('-');
-  return '<div class="row" onclick="tryDeleteExpense(\'' + e.id + '\')">' +
+  return '<div class="row">' +
     '<span class="cat-dot" style="background:' + color + ';"></span>' +
     '<span class="date num">' + Number(d[1]) + '/' + Number(d[2]) + '</span>' +
     '<span class="name">' + escapeHtml(e.name) + '</span>' +
     '<span class="amt num">' + fmtWon(e.amount) + '</span>' +
+    '<span class="rt"><span class="edit" onclick="openEditExpense(\'' + e.id + '\')">수정</span><span class="del" onclick="tryDeleteExpense(\'' + e.id + '\')">삭제</span></span>' +
   '</div>';
 }
 
 function incomeRowHtml(e){
   var d = e.date.split('-');
-  return '<div class="row" onclick="tryDeleteIncome(\'' + e.id + '\')">' +
+  return '<div class="row">' +
     '<span class="cat-dot" style="background:var(--pos);"></span>' +
     '<span class="date num">' + Number(d[1]) + '/' + Number(d[2]) + '</span>' +
     '<span class="name">' + escapeHtml(e.name || '수입') + '</span>' +
     '<span class="amt num" style="color:var(--pos);">+' + fmtWon(e.amount) + '</span>' +
+    '<span class="rt"><span class="edit" onclick="openEditIncome(\'' + e.id + '\')">수정</span><span class="del" onclick="tryDeleteIncome(\'' + e.id + '\')">삭제</span></span>' +
   '</div>';
 }
 
@@ -711,6 +718,7 @@ function tryDeleteIncome(id){
 
 // ── 지출/수입 추가 시트 ──────────────────────────────────────────────────
 function openAddSheet(){
+  editingId = null;
   document.getElementById('fDate').value = todayStr();
   document.getElementById('fAmount').value = '';
   document.getElementById('fName').value = '';
@@ -718,10 +726,40 @@ function openAddSheet(){
   selectedSub = null;
   renderVarChips();
   renderFixedChips();
+  document.getElementById('modeToggle').style.display = 'flex';
   setEntryMode('expense');
   document.getElementById('addOverlay').classList.add('open');
 }
-function closeAddSheet(){ document.getElementById('addOverlay').classList.remove('open'); }
+function closeAddSheet(){ document.getElementById('addOverlay').classList.remove('open'); editingId = null; }
+
+function openEditExpense(id){
+  var e = D.expenses.find(function(x){ return x.id === id; });
+  if(!e) return;
+  editingId = id;
+  document.getElementById('fDate').value = e.date;
+  document.getElementById('fAmount').value = e.amount;
+  document.getElementById('fName').value = e.name;
+  selectedCat = e.cat;
+  selectedSub = e.sub || null;
+  renderVarChips();
+  renderFixedChips();
+  document.getElementById('modeToggle').style.display = 'none';
+  setEntryMode('expense');
+  document.getElementById('fixedReveal').style.display = (e.cat === '고정비') ? 'flex' : 'none';
+  document.getElementById('addOverlay').classList.add('open');
+}
+
+function openEditIncome(id){
+  var e = D.income.find(function(x){ return x.id === id; });
+  if(!e) return;
+  editingId = id;
+  document.getElementById('fDate').value = e.date;
+  document.getElementById('fAmount').value = e.amount;
+  document.getElementById('fName').value = e.name || '';
+  document.getElementById('modeToggle').style.display = 'none';
+  setEntryMode('income');
+  document.getElementById('addOverlay').classList.add('open');
+}
 
 function setEntryMode(mode){
   entryMode = mode;
@@ -730,7 +768,10 @@ function setEntryMode(mode){
   });
 
   var isIncome = mode === 'income';
-  document.getElementById('addSheetTitle').textContent = isIncome ? '수입 추가' : '지출 추가';
+  var isEditing = !!editingId;
+  document.getElementById('addSheetTitle').textContent = isEditing
+    ? (isIncome ? '수입 수정' : '지출 수정')
+    : (isIncome ? '수입 추가' : '지출 추가');
   document.getElementById('fNameLabel').textContent = isIncome ? '출처 (선택)' : '항목명';
   document.getElementById('fName').placeholder = isIncome ? '예: 캐시워크, 오늘의집 적립' : '예: 이마트 장보기';
   document.getElementById('catField').style.display = isIncome ? 'none' : 'flex';
@@ -770,12 +811,25 @@ function saveEntry(){
   if(!amount || amount <= 0){ alert('금액을 입력해주세요'); return; }
 
   if(entryMode === 'income'){
-    D.income.push({ id: uid(), date: date, amount: amount, name: name });
+    if(editingId){
+      var incomeEntry = D.income.find(function(x){ return x.id === editingId; });
+      if(incomeEntry){ incomeEntry.date = date; incomeEntry.amount = amount; incomeEntry.name = name; }
+    } else {
+      D.income.push({ id: uid(), date: date, amount: amount, name: name });
+    }
   } else {
     if(!name){ alert('항목명을 입력해주세요'); return; }
     if(!selectedCat){ alert('카테고리를 선택해주세요'); return; }
     if(selectedCat === '고정비' && !selectedSub){ alert('고정비 세부카테고리를 선택해주세요'); return; }
-    D.expenses.push({ id: uid(), date: date, amount: amount, name: name, cat: selectedCat, sub: selectedSub || '' });
+    if(editingId){
+      var expenseEntry = D.expenses.find(function(x){ return x.id === editingId; });
+      if(expenseEntry){
+        expenseEntry.date = date; expenseEntry.amount = amount; expenseEntry.name = name;
+        expenseEntry.cat = selectedCat; expenseEntry.sub = selectedSub || '';
+      }
+    } else {
+      D.expenses.push({ id: uid(), date: date, amount: amount, name: name, cat: selectedCat, sub: selectedSub || '' });
+    }
   }
 
   save();
