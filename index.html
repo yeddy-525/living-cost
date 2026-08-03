@@ -82,10 +82,21 @@
   .ledger-amt .u{ font-size:12px; font-weight:600; color:var(--muted); margin-left:2px; }
   .ledger-track{ position:relative; height:14px; border-radius:8px; background:var(--line-soft); }
   .ledger-fill{ position:absolute; inset:0 auto 0 0; width:0%; border-radius:8px; transition:width 700ms var(--ease-out); }
-  .ledger-tick{ position:absolute; top:-4px; bottom:-4px; width:2px; background:var(--ink); opacity:.5; border-radius:1px; }
-  .ledger-tick .tt{ position:absolute; top:-18px; left:50%; transform:translateX(-50%); font-size:9px; color:var(--muted-2); white-space:nowrap; }
+  .ledger-tick{ position:absolute; top:-3px; bottom:-3px; width:3px; background:var(--ink); opacity:.65; border-radius:2px; }
+  .ledger-tick::before{
+    content:""; position:absolute; top:-7px; left:50%; transform:translateX(-50%);
+    width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid var(--ink); opacity:.65;
+  }
   .ledger-foot{ display:flex; justify-content:space-between; font-size:11.5px; color:var(--muted-2); }
   .ledger-foot b{ font-weight:700; }
+
+  .pace-badge{
+    display:inline-flex; align-items:center; gap:5px; align-self:flex-start;
+    font-size:12.5px; font-weight:700; padding:6px 11px; border-radius:100px;
+  }
+  .pace-badge.good{ background:color-mix(in srgb, var(--pos) 16%, transparent); color:var(--pos); }
+  .pace-badge.warn{ background:color-mix(in srgb, var(--warn) 18%, transparent); color:var(--warn); }
+  .pace-badge.over{ background:color-mix(in srgb, var(--over) 18%, transparent); color:var(--over); }
   .ledger-empty{ font-size:12px; color:var(--muted-2); }
 
   .donut-card{ background:var(--surface); border:1px solid var(--line-soft); border-radius:16px; padding:14px; display:flex; gap:16px; align-items:center; }
@@ -513,15 +524,19 @@ function renderLedger(){
   var pace = isCurrentMonth ? Math.round(today.getDate() / daysInMonth(viewMonth) * 100) : null;
 
   var fillColor = 'var(--pos)';
-  var paceLine = '';
+  var badgeHtml = '';
   if(spent > budgetTotal){
     fillColor = 'var(--over)';
+    badgeHtml = '<div class="pace-badge over">▲ 예산 초과</div>';
   } else if(pace !== null){
-    fillColor = pct > pace ? 'var(--warn)' : 'var(--pos)';
     var diff = pct - pace;
-    paceLine = diff > 0
-      ? '<span><b style="color:var(--warn)">페이스보다 ' + diff + '%p 빠름</b></span>'
-      : '<span><b style="color:var(--pos)">페이스보다 ' + Math.abs(diff) + '%p 여유</b></span>';
+    if(diff > 0){
+      fillColor = 'var(--warn)';
+      badgeHtml = '<div class="pace-badge warn">▲ 페이스보다 ' + diff + '%p 빠르게 쓰는 중</div>';
+    } else {
+      fillColor = 'var(--pos)';
+      badgeHtml = '<div class="pace-badge good">▼ 페이스보다 ' + Math.abs(diff) + '%p 여유 있음</div>';
+    }
   }
 
   var budgetLabel = '이번 달 예산 <span class="num">' + budget.toLocaleString() + '</span>원';
@@ -532,13 +547,14 @@ function renderLedger(){
   el.innerHTML =
     '<div class="ledger-label">' + budgetLabel + '</div>' +
     '<div class="ledger-amt num">' + fmtWon(spent) + '<span class="u">썼어요</span></div>' +
+    badgeHtml +
     '<div class="ledger-track">' +
       '<div class="ledger-fill" style="width:0%; background:' + fillColor + ';" id="ledgerFillEl"></div>' +
-      (pace !== null ? '<div class="ledger-tick" style="left:' + pace + '%;"><span class="tt">오늘 기준</span></div>' : '') +
+      (pace !== null ? '<div class="ledger-tick" style="left:' + pace + '%;"></div>' : '') +
     '</div>' +
     '<div class="ledger-foot num">' +
       '<span>' + fmtWon(Math.max(0, budgetTotal - spent)) + ' 남음</span>' +
-      (paceLine || '<span>' + pct + '%</span>') +
+      '<span>' + (pace !== null ? '오늘 기준 ' + pace + '% 지점 · ' : '') + pct + '% 사용</span>' +
     '</div>';
 
   requestAnimationFrame(function(){
