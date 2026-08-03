@@ -384,12 +384,6 @@ function incomeForMonth(ymStr){
 
 function budgetForMonth(ymStr){ return D.budgets[ymStr] || 0; }
 
-// 앱테크 등 수입은 생활비통장에 합쳐지는 돈이라, 이번 달 예산에 그대로 더해짐
-function effectiveBudget(ymStr){
-  var incomeSum = incomeForMonth(ymStr).reduce(function(s,e){ return s + Number(e.amount||0); }, 0);
-  return budgetForMonth(ymStr) + incomeSum;
-}
-
 // ── 저장 / 동기화 ─────────────────────────────────────────────────────────
 function save(){
   D._savedAt = Date.now();
@@ -512,11 +506,11 @@ function renderLedger(){
   var list = expensesForMonth(viewMonth);
   var spent = list.reduce(function(s,e){ return s + Number(e.amount||0); }, 0);
   var budget = budgetForMonth(viewMonth);
+  // 수입(앱테크 등)은 예산과 별개라서 게이지/남은 돈 계산엔 안 들어가고, 위쪽 라벨에만 참고로 표시함
   var incomeSum = incomeForMonth(viewMonth).reduce(function(s,e){ return s + Number(e.amount||0); }, 0);
-  var budgetTotal = budget + incomeSum;
   var el = document.getElementById('ledgerCard');
 
-  if(!budgetTotal){
+  if(!budget){
     el.innerHTML =
       '<div class="ledger-label">이번 달 예산이 아직 없어요</div>' +
       '<div class="ledger-amt num">' + fmtWon(spent) + '<span class="u">썼어요</span></div>' +
@@ -524,13 +518,13 @@ function renderLedger(){
     return;
   }
 
-  var pct = Math.min(999, Math.round(spent / budgetTotal * 100));
+  var pct = Math.min(999, Math.round(spent / budget * 100));
   var isCurrentMonth = viewMonth === ym(today);
   var pace = isCurrentMonth ? Math.round(today.getDate() / daysInMonth(viewMonth) * 100) : null;
 
   var fillColor = 'var(--pos)';
   var badgeHtml = '';
-  if(spent > budgetTotal){
+  if(spent > budget){
     fillColor = 'var(--over)';
     badgeHtml = '<div class="pace-badge over">▲ 예산 초과</div>';
   } else if(pace !== null){
@@ -558,7 +552,7 @@ function renderLedger(){
       (pace !== null ? '<div class="ledger-tick" style="left:' + pace + '%;"></div>' : '') +
     '</div>' +
     '<div class="ledger-foot num">' +
-      '<span>' + fmtWon(Math.max(0, budgetTotal - spent)) + ' 남음</span>' +
+      '<span>' + fmtWon(Math.max(0, budget - spent)) + ' 남음</span>' +
       '<span>' + (pace !== null ? '오늘 기준 ' + pace + '% 지점 · ' : '') + pct + '% 사용</span>' +
     '</div>';
 
