@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>생활비 가계부</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f8f82">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root{
     --bg:#f3f6ee; --surface:#ffffff; --surface-2:#edf1e6;
@@ -715,6 +719,10 @@ function removeCategory(kind, name){
 // ── 초기화 ──────────────────────────────────────────────────────────────
 renderAll();
 if(gasUrl()) loadFromGas(false, true);
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+}
 </script>
 </body>
 </html>

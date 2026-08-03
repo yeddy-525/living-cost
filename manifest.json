@@ -1,0 +1,13 @@
+{
+  "name": "생활비 가계부",
+  "short_name": "생활비가계부",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f6ee",
+  "theme_color": "#0f8f82",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
