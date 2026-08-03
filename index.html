@@ -108,6 +108,16 @@
   .chip.on{ border-color:var(--accent); color:#fff; background:var(--accent); font-weight:600; }
   .chip.dashed{ border-style:dashed; }
   .chip.on.fixed-on{ background:var(--fixed); border-color:var(--fixed); }
+  .chip.on.income-on{ background:var(--pos); border-color:var(--pos); }
+
+  .mode-toggle{ display:flex; gap:4px; background:var(--surface-2); border-radius:11px; padding:4px; }
+  .mode-btn{
+    flex:1; border:none; background:none; color:var(--muted); font-size:12.5px; font-weight:600;
+    padding:9px 8px; border-radius:8px; cursor:pointer;
+    transition:background 160ms var(--ease-out), color 160ms var(--ease-out);
+  }
+  .mode-btn.on{ background:var(--surface); color:var(--ink); box-shadow:0 1px 3px var(--shadow); }
+  .mode-btn[data-mode="income"].on{ color:var(--pos); }
 
   .list{ display:flex; flex-direction:column; border:1px solid var(--line-soft); border-radius:14px; overflow:hidden; background:var(--surface); }
   .row{ display:flex; align-items:center; gap:10px; padding:11px 13px; border-bottom:1px solid var(--line-soft); font-size:12.5px; cursor:pointer; transition:background 150ms var(--ease-out); }
@@ -216,12 +226,17 @@
 
 </div>
 
-<!-- Add expense sheet -->
+<!-- Add expense/income sheet -->
 <div class="overlay" id="addOverlay">
   <div class="dim" onclick="closeAddSheet()"></div>
   <div class="sheet">
     <div class="sheet-handle"></div>
-    <div class="sheet-title"><span>지출 추가</span><span class="sheet-close" onclick="closeAddSheet()">닫기</span></div>
+    <div class="sheet-title"><span id="addSheetTitle">지출 추가</span><span class="sheet-close" onclick="closeAddSheet()">닫기</span></div>
+
+    <div class="mode-toggle" id="modeToggle">
+      <button type="button" class="mode-btn on" data-mode="expense" onclick="setEntryMode('expense')">지출</button>
+      <button type="button" class="mode-btn" data-mode="income" onclick="setEntryMode('income')">수입 (앱테크 등)</button>
+    </div>
 
     <div class="field">
       <label>날짜</label>
@@ -232,10 +247,10 @@
       <input type="number" id="fAmount" class="amt" placeholder="0" inputmode="numeric">
     </div>
     <div class="field">
-      <label>항목명</label>
+      <label id="fNameLabel">항목명</label>
       <input type="text" id="fName" placeholder="예: 이마트 장보기">
     </div>
-    <div class="field">
+    <div class="field" id="catField">
       <label>카테고리</label>
       <div class="chip-row" id="varChipRow"></div>
     </div>
@@ -243,8 +258,9 @@
       <label>고정비 세부카테고리</label>
       <div class="chip-row" id="fixedChipRow"></div>
     </div>
+    <div class="hint" id="incomeHint" style="display:none;">이번 달 예산에 그대로 더해져요 (생활비통장에 합쳐지는 돈)</div>
 
-    <button class="btn-primary" onclick="saveExpense()">저장</button>
+    <button class="btn-primary" onclick="saveEntry()">저장</button>
   </div>
 </div>
 
@@ -304,6 +320,7 @@ var FIXED_COLOR_VARS = ['--fc1','--fc2','--fc3','--fc4','--fc5'];
 // ── 상태 ────────────────────────────────────────────────────────────────
 var D = load() || {
   expenses: [],
+  income: [],
   budgets: {},
   cats: {
     variable: ['식비','생필품','데이트','교통','기타'],
@@ -311,10 +328,12 @@ var D = load() || {
   },
   _savedAt: 0
 };
+if(!D.income) D.income = []; // 기존에 저장된 데이터엔 없을 수 있어서 보정
 
 var today = new Date();
 var viewMonth = ym(today);
 var activeFilter = 'all';
+var entryMode = 'expense';
 var selectedCat = null;
 var selectedSub = null;
 
@@ -343,7 +362,17 @@ function expensesForMonth(ymStr){
   return D.expenses.filter(function(e){ return e.date.slice(0,7) === ymStr; });
 }
 
+function incomeForMonth(ymStr){
+  return D.income.filter(function(e){ return e.date.slice(0,7) === ymStr; });
+}
+
 function budgetForMonth(ymStr){ return D.budgets[ymStr] || 0; }
+
+// 앱테크 등 수입은 생활비통장에 합쳐지는 돈이라, 이번 달 예산에 그대로 더해짐
+function effectiveBudget(ymStr){
+  var incomeSum = incomeForMonth(ymStr).reduce(function(s,e){ return s + Number(e.amount||0); }, 0);
+  return budgetForMonth(ymStr) + incomeSum;
+}
 
 // ── 저장 / 동기화 ─────────────────────────────────────────────────────────
 function save(){
@@ -419,6 +448,7 @@ function loadFromGas(force, isInitial){
     var applied = force || (remote._savedAt||0) > (D._savedAt||0);
     if(applied){
       D = remote;
+      if(!D.income) D.income = [];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(D));
       renderAll();
     }
@@ -459,9 +489,11 @@ function renderLedger(){
   var list = expensesForMonth(viewMonth);
   var spent = list.reduce(function(s,e){ return s + Number(e.amount||0); }, 0);
   var budget = budgetForMonth(viewMonth);
+  var incomeSum = incomeForMonth(viewMonth).reduce(function(s,e){ return s + Number(e.amount||0); }, 0);
+  var budgetTotal = budget + incomeSum;
   var el = document.getElementById('ledgerCard');
 
-  if(!budget){
+  if(!budgetTotal){
     el.innerHTML =
       '<div class="ledger-label">이번 달 예산이 아직 없어요</div>' +
       '<div class="ledger-amt num">' + fmtWon(spent) + '<span class="u">썼어요</span></div>' +
@@ -469,13 +501,13 @@ function renderLedger(){
     return;
   }
 
-  var pct = Math.min(999, Math.round(spent / budget * 100));
+  var pct = Math.min(999, Math.round(spent / budgetTotal * 100));
   var isCurrentMonth = viewMonth === ym(today);
   var pace = isCurrentMonth ? Math.round(today.getDate() / daysInMonth(viewMonth) * 100) : null;
 
   var fillColor = 'var(--pos)';
   var paceLine = '';
-  if(spent > budget){
+  if(spent > budgetTotal){
     fillColor = 'var(--over)';
   } else if(pace !== null){
     fillColor = pct > pace ? 'var(--warn)' : 'var(--pos)';
@@ -485,15 +517,20 @@ function renderLedger(){
       : '<span><b style="color:var(--pos)">페이스보다 ' + Math.abs(diff) + '%p 여유</b></span>';
   }
 
+  var budgetLabel = '이번 달 예산 <span class="num">' + budget.toLocaleString() + '</span>원';
+  if(incomeSum > 0){
+    budgetLabel += ' <span style="color:var(--pos);">+ 수입 ' + incomeSum.toLocaleString() + '원</span>';
+  }
+
   el.innerHTML =
-    '<div class="ledger-label">이번 달 예산 <span class="num">' + budget.toLocaleString() + '</span>원</div>' +
+    '<div class="ledger-label">' + budgetLabel + '</div>' +
     '<div class="ledger-amt num">' + fmtWon(spent) + '<span class="u">썼어요</span></div>' +
     '<div class="ledger-track">' +
       '<div class="ledger-fill" style="width:0%; background:' + fillColor + ';" id="ledgerFillEl"></div>' +
       (pace !== null ? '<div class="ledger-tick" style="left:' + pace + '%;"><span class="tt">오늘 기준</span></div>' : '') +
     '</div>' +
     '<div class="ledger-foot num">' +
-      '<span>' + fmtWon(Math.max(0, budget - spent)) + ' 남음</span>' +
+      '<span>' + fmtWon(Math.max(0, budgetTotal - spent)) + ' 남음</span>' +
       (paceLine || '<span>' + pct + '%</span>') +
     '</div>';
 
@@ -568,6 +605,7 @@ function renderFilterChips(){
     chips.push('<span class="chip ' + (activeFilter===c?'on':'') + '" onclick="setFilter(\'' + c + '\')">' + c + '</span>');
   });
   chips.push('<span class="chip dashed ' + (activeFilter==='고정비'?'on fixed-on':'') + '" onclick="setFilter(\'고정비\')">고정비</span>');
+  chips.push('<span class="chip ' + (activeFilter==='수입'?'on income-on':'') + '" onclick="setFilter(\'수입\')">수입</span>');
   el.innerHTML = chips.join('');
 }
 
@@ -575,6 +613,12 @@ function setFilter(f){ activeFilter = f; renderFilterChips(); renderExpenseList(
 
 function renderExpenseList(){
   var el = document.getElementById('expenseList');
+
+  if(activeFilter === '수입'){
+    renderIncomeList(el);
+    return;
+  }
+
   var list = expensesForMonth(viewMonth).filter(function(e){
     if(activeFilter === 'all') return true;
     return e.cat === activeFilter;
@@ -601,6 +645,25 @@ function renderExpenseList(){
   }).join('');
 }
 
+function renderIncomeList(el){
+  var list = incomeForMonth(viewMonth).sort(function(a,b){ return b.date.localeCompare(a.date) || b.id.localeCompare(a.id); });
+
+  if(!list.length){
+    el.innerHTML = '<div class="list-empty">이번 달 수입 내역이 없어요</div>';
+    return;
+  }
+
+  el.innerHTML = list.map(function(e){
+    var d = e.date.split('-');
+    return '<div class="row" onclick="tryDeleteIncome(\'' + e.id + '\')">' +
+      '<span class="cat-dot" style="background:var(--pos);"></span>' +
+      '<span class="date num">' + Number(d[1]) + '/' + Number(d[2]) + '</span>' +
+      '<span class="name">' + escapeHtml(e.name || '수입') + '</span>' +
+      '<span class="amt num" style="color:var(--pos);">+' + fmtWon(e.amount) + '</span>' +
+    '</div>';
+  }).join('');
+}
+
 function escapeHtml(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
 
 function tryDeleteExpense(id){
@@ -613,7 +676,17 @@ function tryDeleteExpense(id){
   }
 }
 
-// ── 지출 추가 시트 ────────────────────────────────────────────────────────
+function tryDeleteIncome(id){
+  var e = D.income.find(function(x){ return x.id === id; });
+  if(!e) return;
+  if(confirm(escapeHtml(e.name || '수입') + ' (+' + fmtWon(e.amount) + ') 삭제할까요?')){
+    D.income = D.income.filter(function(x){ return x.id !== id; });
+    save();
+    renderAll();
+  }
+}
+
+// ── 지출/수입 추가 시트 ──────────────────────────────────────────────────
 function openAddSheet(){
   document.getElementById('fDate').value = todayStr();
   document.getElementById('fAmount').value = '';
@@ -622,10 +695,25 @@ function openAddSheet(){
   selectedSub = null;
   renderVarChips();
   renderFixedChips();
-  document.getElementById('fixedReveal').style.display = 'none';
+  setEntryMode('expense');
   document.getElementById('addOverlay').classList.add('open');
 }
 function closeAddSheet(){ document.getElementById('addOverlay').classList.remove('open'); }
+
+function setEntryMode(mode){
+  entryMode = mode;
+  document.querySelectorAll('#modeToggle .mode-btn').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-mode') === mode);
+  });
+
+  var isIncome = mode === 'income';
+  document.getElementById('addSheetTitle').textContent = isIncome ? '수입 추가' : '지출 추가';
+  document.getElementById('fNameLabel').textContent = isIncome ? '출처 (선택)' : '항목명';
+  document.getElementById('fName').placeholder = isIncome ? '예: 캐시워크, 오늘의집 적립' : '예: 이마트 장보기';
+  document.getElementById('catField').style.display = isIncome ? 'none' : 'flex';
+  document.getElementById('fixedReveal').style.display = (!isIncome && selectedCat === '고정비') ? 'flex' : 'none';
+  document.getElementById('incomeHint').style.display = isIncome ? 'block' : 'none';
+}
 
 function renderVarChips(){
   var el = document.getElementById('varChipRow');
@@ -650,18 +738,23 @@ function pickCat(c){
 }
 function pickSub(c){ selectedSub = c; renderFixedChips(); }
 
-function saveExpense(){
+function saveEntry(){
   var date = document.getElementById('fDate').value;
   var amount = Number(document.getElementById('fAmount').value);
   var name = document.getElementById('fName').value.trim();
 
   if(!date){ alert('날짜를 선택해주세요'); return; }
   if(!amount || amount <= 0){ alert('금액을 입력해주세요'); return; }
-  if(!name){ alert('항목명을 입력해주세요'); return; }
-  if(!selectedCat){ alert('카테고리를 선택해주세요'); return; }
-  if(selectedCat === '고정비' && !selectedSub){ alert('고정비 세부카테고리를 선택해주세요'); return; }
 
-  D.expenses.push({ id: uid(), date: date, amount: amount, name: name, cat: selectedCat, sub: selectedSub || '' });
+  if(entryMode === 'income'){
+    D.income.push({ id: uid(), date: date, amount: amount, name: name });
+  } else {
+    if(!name){ alert('항목명을 입력해주세요'); return; }
+    if(!selectedCat){ alert('카테고리를 선택해주세요'); return; }
+    if(selectedCat === '고정비' && !selectedSub){ alert('고정비 세부카테고리를 선택해주세요'); return; }
+    D.expenses.push({ id: uid(), date: date, amount: amount, name: name, cat: selectedCat, sub: selectedSub || '' });
+  }
+
   save();
   closeAddSheet();
   viewMonth = date.slice(0,7);

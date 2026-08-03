@@ -6,6 +6,7 @@
 
 const SH = {
   EXPENSES : 'Expenses',
+  INCOME   : 'Income',
   BUDGETS  : 'Budgets',
   CATS_VAR : 'Categories_Variable',
   CATS_FIX : 'Categories_Fixed',
@@ -13,6 +14,7 @@ const SH = {
 }
 
 const EXPENSE_COLS = ['id','date','amount','name','cat','sub']
+const INCOME_COLS = ['id','date','amount','name']
 
 // ── 진입점 ────────────────────────────────────────────────────────────────
 
@@ -21,6 +23,10 @@ function doGet(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet()
     const D = {
       expenses: readRows(ss, SH.EXPENSES, EXPENSE_COLS).map(function(r){
+        r.amount = Number(r.amount) || 0
+        return r
+      }),
+      income: readRows(ss, SH.INCOME, INCOME_COLS).map(function(r){
         r.amount = Number(r.amount) || 0
         return r
       }),
@@ -45,6 +51,7 @@ function doPost(e) {
     const D = JSON.parse(e.postData.contents)
 
     writeRows(ss, SH.EXPENSES, D.expenses || [], EXPENSE_COLS, ['date'])
+    writeRows(ss, SH.INCOME, D.income || [], INCOME_COLS, ['date'])
     writeBudgets(ss, D.budgets || {})
     writeSimpleList(ss, SH.CATS_VAR, (D.cats && D.cats.variable) || [])
     writeSimpleList(ss, SH.CATS_FIX, (D.cats && D.cats.fixed) || [])
