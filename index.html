@@ -394,13 +394,19 @@ function saveGasUrl(){
   renderSyncStatus();
 }
 
-// 업로드: 사용자가 "지금 업로드"를 눌렀을 때만 실행됨 (자동 트리거 없음)
-function pushToGas(){
+// 업로드: 지출/수입을 저장할 때(quiet=true, 상단 표시) 또는 설정의
+// "지금 업로드" 버튼(quiet=false, 버튼 자체에 표시)을 눌렀을 때만 실행됨.
+// 자동 디바운스/타이머 트리거는 없음 — 매번 사용자의 명시적인 저장 행동에 바로 이어서만 나감
+function pushToGas(quiet){
   var url = gasUrl();
-  if(!url){ alert('먼저 GAS 웹앱 URL을 입력하고 저장해주세요'); return; }
-  var btn = document.getElementById('btnPush');
-  btn.textContent = '업로드 중...';
-  btn.disabled = true;
+  if(!url){
+    if(!quiet) alert('먼저 GAS 웹앱 URL을 입력하고 저장해주세요');
+    return;
+  }
+  var btn = quiet ? null : document.getElementById('btnPush');
+  if(btn){ btn.textContent = '업로드 중...'; btn.disabled = true; }
+  if(quiet) setSyncIndicator('<span class="dot"></span>구글시트에 업로드 중...');
+
   fetch(url, {
     method:'POST', mode:'no-cors',
     headers:{ 'Content-Type':'text/plain' },
@@ -408,11 +414,12 @@ function pushToGas(){
   }).then(function(){
     localStorage.setItem('lc_last_push_at', String(Date.now()));
     renderSyncStatus();
+    if(quiet) setSyncIndicator('구글시트에 저장했어요', true);
   }).catch(function(){
-    alert('업로드에 실패했어요. GAS 배포 URL이 맞는지 확인해주세요.');
+    if(!quiet) alert('업로드에 실패했어요. GAS 배포 URL이 맞는지 확인해주세요.');
+    else setSyncIndicator('구글시트 업로드 실패 (연결 확인)', true);
   }).finally(function(){
-    btn.textContent = '지금 업로드';
-    btn.disabled = false;
+    if(btn){ btn.textContent = '지금 업로드'; btn.disabled = false; }
   });
 }
 
@@ -759,6 +766,7 @@ function saveEntry(){
   closeAddSheet();
   viewMonth = date.slice(0,7);
   renderAll();
+  if(gasUrl()) pushToGas(true); // 저장 직후 바로 구글시트까지 반영 (사용자가 명시적으로 요청한 동작)
 }
 
 // ── 설정 시트 ───────────────────────────────────────────────────────────
