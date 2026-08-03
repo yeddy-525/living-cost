@@ -53,6 +53,15 @@
   }
   .icon-btn:hover{ border-color:var(--accent); color:var(--accent-ink); }
 
+  .sync-indicator{
+    display:none; align-items:center; justify-content:center; gap:6px;
+    font-size:11px; color:var(--muted-2); padding:1px 0 3px;
+    opacity:0; transition:opacity 200ms var(--ease-out);
+  }
+  .sync-indicator.show{ display:flex; opacity:1; }
+  .sync-indicator .dot{ width:6px; height:6px; border-radius:50%; background:var(--accent); animation:sync-pulse 1s ease-in-out infinite; }
+  @keyframes sync-pulse{ 0%,100%{ opacity:.3; } 50%{ opacity:1; } }
+
   .month-nav{ display:flex; align-items:center; justify-content:center; gap:16px; font-size:14px; color:var(--muted); }
   .month-nav .cur{ color:var(--ink); font-weight:700; min-width:100px; text-align:center; }
   .month-nav .arrow{
@@ -182,6 +191,8 @@
     <div class="brand">생활비 가계부</div>
     <div class="icon-btn" onclick="openSettings()" aria-label="설정">⚙</div>
   </div>
+
+  <div class="sync-indicator" id="syncIndicator"></div>
 
   <div class="month-nav">
     <button class="arrow" onclick="shiftMonth(-1)">‹</button>
@@ -372,24 +383,45 @@ function pushToGas(){
   });
 }
 
+function setSyncIndicator(html, autoHide){
+  var el = document.getElementById('syncIndicator');
+  if(!el) return;
+  if(!html){ el.classList.remove('show'); el.innerHTML = ''; return; }
+  el.innerHTML = html;
+  el.classList.add('show');
+  clearTimeout(setSyncIndicator._t);
+  if(autoHide){
+    setSyncIndicator._t = setTimeout(function(){ el.classList.remove('show'); }, 2200);
+  }
+}
+
 // 불러오기: force=true(버튼)면 로컬을 무조건 구글시트 내용으로 덮어씀
 // 앱 시작 시에는 force=false로 호출 — 로컬이 더 최근이면 덮어쓰지 않음
-function loadFromGas(force){
+// isInitial=true면 상단 "동기화 확인 중" 표시를 띄우고 결과를 알려줌
+function loadFromGas(force, isInitial){
   var url = gasUrl();
   if(!url) return;
   if(force){
     var btn = document.getElementById('btnPull');
     if(btn){ btn.textContent = '불러오는 중...'; btn.disabled = true; }
   }
+  if(isInitial) setSyncIndicator('<span class="dot"></span>동기화 확인 중...');
+
   fetch(url).then(function(r){ return r.json(); }).then(function(remote){
-    if(!remote || remote.error || !remote.expenses) return;
-    if(force || (remote._savedAt||0) > (D._savedAt||0)){
+    if(!remote || remote.error || !remote.expenses){
+      if(isInitial) setSyncIndicator('동기화 확인 실패', true);
+      return;
+    }
+    var applied = force || (remote._savedAt||0) > (D._savedAt||0);
+    if(applied){
       D = remote;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(D));
       renderAll();
     }
+    if(isInitial) setSyncIndicator(applied ? '구글시트 최신 데이터 반영했어요' : '이미 최신 상태예요', true);
   }).catch(function(){
     if(force) alert('불러오기에 실패했어요. GAS 배포 URL이 맞는지 확인해주세요.');
+    if(isInitial) setSyncIndicator('동기화 확인 실패 (연결 안 됨)', true);
   }).finally(function(){
     var btn = document.getElementById('btnPull');
     if(btn){ btn.textContent = '지금 불러오기'; btn.disabled = false; renderSyncStatus(); }
@@ -682,7 +714,7 @@ function removeCategory(kind, name){
 
 // ── 초기화 ──────────────────────────────────────────────────────────────
 renderAll();
-if(gasUrl()) loadFromGas(false);
+if(gasUrl()) loadFromGas(false, true);
 </script>
 </body>
 </html>
