@@ -634,57 +634,57 @@ function renderFilterChips(){
 
 function setFilter(f){ activeFilter = f; renderFilterChips(); renderExpenseList(); }
 
+function expenseRowHtml(e){
+  var isFixed = e.cat === '고정비';
+  var label = isFixed ? e.sub : e.cat;
+  var idx = isFixed ? D.cats.fixed.indexOf(e.sub) : D.cats.variable.indexOf(e.cat);
+  if(idx < 0) idx = 0;
+  var color = catColor(label, isFixed, idx);
+  var d = e.date.split('-');
+  return '<div class="row" onclick="tryDeleteExpense(\'' + e.id + '\')">' +
+    '<span class="cat-dot" style="background:' + color + ';"></span>' +
+    '<span class="date num">' + Number(d[1]) + '/' + Number(d[2]) + '</span>' +
+    '<span class="name">' + escapeHtml(e.name) + '</span>' +
+    '<span class="amt num">' + fmtWon(e.amount) + '</span>' +
+  '</div>';
+}
+
+function incomeRowHtml(e){
+  var d = e.date.split('-');
+  return '<div class="row" onclick="tryDeleteIncome(\'' + e.id + '\')">' +
+    '<span class="cat-dot" style="background:var(--pos);"></span>' +
+    '<span class="date num">' + Number(d[1]) + '/' + Number(d[2]) + '</span>' +
+    '<span class="name">' + escapeHtml(e.name || '수입') + '</span>' +
+    '<span class="amt num" style="color:var(--pos);">+' + fmtWon(e.amount) + '</span>' +
+  '</div>';
+}
+
+function byDateDesc(a,b){ return b.date.localeCompare(a.date) || b.id.localeCompare(a.id); }
+
 function renderExpenseList(){
   var el = document.getElementById('expenseList');
 
+  // "수입" 칩: 수입만 보여줌
   if(activeFilter === '수입'){
-    renderIncomeList(el);
+    var incomeOnly = incomeForMonth(viewMonth).sort(byDateDesc);
+    el.innerHTML = incomeOnly.length ? incomeOnly.map(incomeRowHtml).join('') : '<div class="list-empty">이번 달 수입 내역이 없어요</div>';
     return;
   }
 
-  var list = expensesForMonth(viewMonth).filter(function(e){
+  // "전체": 지출 + 수입을 날짜순으로 섞어서 보여줌
+  // 특정 카테고리 칩: 그 카테고리 지출만 (수입은 카테고리가 없어서 여기엔 안 나옴)
+  var expenseRows = expensesForMonth(viewMonth).filter(function(e){
     if(activeFilter === 'all') return true;
     return e.cat === activeFilter;
-  }).sort(function(a,b){ return b.date.localeCompare(a.date) || b.id.localeCompare(a.id); });
+  }).map(function(e){ return { date: e.date, id: e.id, html: expenseRowHtml(e) }; });
 
-  if(!list.length){
-    el.innerHTML = '<div class="list-empty">해당하는 지출 내역이 없어요</div>';
-    return;
-  }
+  var incomeRows = activeFilter === 'all'
+    ? incomeForMonth(viewMonth).map(function(e){ return { date: e.date, id: e.id, html: incomeRowHtml(e) }; })
+    : [];
 
-  el.innerHTML = list.map(function(e){
-    var isFixed = e.cat === '고정비';
-    var label = isFixed ? e.sub : e.cat;
-    var idx = isFixed ? D.cats.fixed.indexOf(e.sub) : D.cats.variable.indexOf(e.cat);
-    if(idx < 0) idx = 0;
-    var color = catColor(label, isFixed, idx);
-    var d = e.date.split('-');
-    return '<div class="row" onclick="tryDeleteExpense(\'' + e.id + '\')">' +
-      '<span class="cat-dot" style="background:' + color + ';"></span>' +
-      '<span class="date num">' + Number(d[1]) + '/' + Number(d[2]) + '</span>' +
-      '<span class="name">' + escapeHtml(e.name) + '</span>' +
-      '<span class="amt num">' + fmtWon(e.amount) + '</span>' +
-    '</div>';
-  }).join('');
-}
+  var rows = expenseRows.concat(incomeRows).sort(byDateDesc);
 
-function renderIncomeList(el){
-  var list = incomeForMonth(viewMonth).sort(function(a,b){ return b.date.localeCompare(a.date) || b.id.localeCompare(a.id); });
-
-  if(!list.length){
-    el.innerHTML = '<div class="list-empty">이번 달 수입 내역이 없어요</div>';
-    return;
-  }
-
-  el.innerHTML = list.map(function(e){
-    var d = e.date.split('-');
-    return '<div class="row" onclick="tryDeleteIncome(\'' + e.id + '\')">' +
-      '<span class="cat-dot" style="background:var(--pos);"></span>' +
-      '<span class="date num">' + Number(d[1]) + '/' + Number(d[2]) + '</span>' +
-      '<span class="name">' + escapeHtml(e.name || '수입') + '</span>' +
-      '<span class="amt num" style="color:var(--pos);">+' + fmtWon(e.amount) + '</span>' +
-    '</div>';
-  }).join('');
+  el.innerHTML = rows.length ? rows.map(function(r){ return r.html; }).join('') : '<div class="list-empty">해당하는 내역이 없어요</div>';
 }
 
 function escapeHtml(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
