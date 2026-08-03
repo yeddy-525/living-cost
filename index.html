@@ -262,9 +262,14 @@
       <div class="title">구글시트 동기화 (선택)</div>
       <div class="sync-row">
         <input type="text" id="fGasUrl" placeholder="GAS 웹앱 URL 붙여넣기">
-        <button class="btn-primary" style="width:auto; padding:0 14px;" onclick="saveGasUrl()">저장</button>
+        <button class="btn-primary" style="width:auto; padding:0 14px;" onclick="saveGasUrl()">URL 저장</button>
+      </div>
+      <div class="sync-row">
+        <button class="btn-primary" id="btnPush" style="background:var(--accent);" onclick="pushToGas()">지금 업로드</button>
+        <button class="btn-primary" id="btnPull" style="background:var(--muted-2);" onclick="pullFromGas()">지금 불러오기</button>
       </div>
       <div class="sync-status" id="syncStatus">동기화 안 됨 (로컬에만 저장)</div>
+      <div class="hint">자동으로 올라가지 않아요 — 다른 기기와 맞추고 싶을 때 직접 눌러야 반영돼요</div>
     </div>
 
   </div>
@@ -329,37 +334,53 @@ function budgetForMonth(ymStr){ return D.budgets[ymStr] || 0; }
 function save(){
   D._savedAt = Date.now();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(D));
-  gasSyncDebounced();
+  // 구글시트 업로드는 자동으로 하지 않음 — 설정 화면의 "지금 업로드" 버튼을 눌러야만 나감
+  // (자동 동기화가 타이밍 버그를 일으킨 전례가 있어서, 이번엔 처음부터 수동 트리거로 설계함)
 }
 function load(){
   try{ var raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; }
   catch(e){ return null; }
 }
 function gasUrl(){ return localStorage.getItem(GAS_URL_KEY) || DEFAULT_GAS_URL; }
+function lastPushAt(){ return Number(localStorage.getItem('lc_last_push_at')) || 0; }
 
-var gasSyncTimer = null;
-function gasSyncDebounced(){
-  clearTimeout(gasSyncTimer);
-  gasSyncTimer = setTimeout(gasSync, 300);
+function saveGasUrl(){
+  var v = document.getElementById('fGasUrl').value.trim();
+  localStorage.setItem(GAS_URL_KEY, v);
+  renderSyncStatus();
 }
-function gasSync(){
+
+// 업로드: 사용자가 "지금 업로드"를 눌렀을 때만 실행됨 (자동 트리거 없음)
+function pushToGas(){
   var url = gasUrl();
-  if(!url) return;
+  if(!url){ alert('먼저 GAS 웹앱 URL을 입력하고 저장해주세요'); return; }
+  var btn = document.getElementById('btnPush');
+  btn.textContent = '업로드 중...';
+  btn.disabled = true;
   fetch(url, {
     method:'POST', mode:'no-cors',
     headers:{ 'Content-Type':'text/plain' },
     body: JSON.stringify(D)
-  }).catch(function(){});
+  }).then(function(){
+    localStorage.setItem('lc_last_push_at', String(Date.now()));
+    renderSyncStatus();
+  }).catch(function(){
+    alert('업로드에 실패했어요. GAS 배포 URL이 맞는지 확인해주세요.');
+  }).finally(function(){
+    btn.textContent = '지금 업로드';
+    btn.disabled = false;
+  });
 }
-window.addEventListener('beforeunload', function(){
-  var url = gasUrl();
-  if(!url) return;
-  fetch(url, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(D), keepalive:true }).catch(function(){});
-});
 
+// 불러오기: force=true(버튼)면 로컬을 무조건 구글시트 내용으로 덮어씀
+// 앱 시작 시에는 force=false로 호출 — 로컬이 더 최근이면 덮어쓰지 않음
 function loadFromGas(force){
   var url = gasUrl();
   if(!url) return;
+  if(force){
+    var btn = document.getElementById('btnPull');
+    if(btn){ btn.textContent = '불러오는 중...'; btn.disabled = true; }
+  }
   fetch(url).then(function(r){ return r.json(); }).then(function(remote){
     if(!remote || remote.error || !remote.expenses) return;
     if(force || (remote._savedAt||0) > (D._savedAt||0)){
@@ -367,14 +388,26 @@ function loadFromGas(force){
       localStorage.setItem(STORAGE_KEY, JSON.stringify(D));
       renderAll();
     }
-  }).catch(function(){});
+  }).catch(function(){
+    if(force) alert('불러오기에 실패했어요. GAS 배포 URL이 맞는지 확인해주세요.');
+  }).finally(function(){
+    var btn = document.getElementById('btnPull');
+    if(btn){ btn.textContent = '지금 불러오기'; btn.disabled = false; renderSyncStatus(); }
+  });
 }
 
-function saveGasUrl(){
-  var v = document.getElementById('fGasUrl').value.trim();
-  localStorage.setItem(GAS_URL_KEY, v);
-  document.getElementById('syncStatus').textContent = v ? '동기화 설정됨 · 불러오는 중...' : '동기화 안 됨 (로컬에만 저장)';
-  if(v) loadFromGas(true);
+function pullFromGas(){
+  if(!gasUrl()){ alert('먼저 GAS 웹앱 URL을 입력하고 저장해주세요'); return; }
+  if(!confirm('구글시트 내용으로 덮어쓸까요? 아직 업로드 안 한 로컬 변경사항은 사라져요.')) return;
+  loadFromGas(true);
+}
+
+function renderSyncStatus(){
+  var el = document.getElementById('syncStatus');
+  if(!el) return;
+  if(!gasUrl()){ el.textContent = '동기화 안 됨 (로컬에만 저장)'; return; }
+  var t = lastPushAt();
+  el.textContent = t ? ('마지막 업로드: ' + new Date(t).toLocaleString('ko-KR')) : '아직 업로드한 적 없어요';
 }
 
 // ── 렌더 ────────────────────────────────────────────────────────────────
@@ -604,7 +637,7 @@ function openSettings(){
   document.getElementById('budgetTitle').textContent = monthLabel(viewMonth) + ' 예산';
   document.getElementById('fBudget').value = D.budgets[viewMonth] || '';
   document.getElementById('fGasUrl').value = gasUrl();
-  document.getElementById('syncStatus').textContent = gasUrl() ? '동기화 설정됨' : '동기화 안 됨 (로컬에만 저장)';
+  renderSyncStatus();
   renderCatSettingsLists();
   document.getElementById('settingsOverlay').classList.add('open');
 }

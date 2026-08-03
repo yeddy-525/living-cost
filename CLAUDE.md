@@ -46,12 +46,17 @@ D = {
 - 지출 진행률이 페이스보다 빠르면 경고색(warn), 느리면 안전색(pos), 예산 초과 시 위험색(over)
 - 과거 달을 볼 땐 페이스 비교 없이 그 달의 최종 결과만 표시 (월 이동 = 결산 화면 역할 겸용)
 
-## 동기화 방식 (wedding-plan과 동일 패턴)
+## 동기화 방식 — wedding-plan과 다르게 감(중요)
 
-- `save()` — `D._savedAt = Date.now()`, localStorage 저장, `gasSyncDebounced()` 호출 (300ms 디바운스 후 POST, no-cors + text/plain)
-- `beforeunload` → `keepalive:true` fetch로 새로고침/닫기 전 강제 전송
-- `loadFromGas(force)` — GAS GET 후 타임스탬프 비교, `force=true`면 무조건 적용
+wedding-plan은 매 변경마다 자동으로 GAS에 디바운스 POST했다가 타이밍 버그(새로고침 시 유실, 가라 데이터로 덮어쓰기)를 여러 번 겪었음. 이 프로젝트는 **그 버그 클래스를 원천 차단**하기 위해 처음부터 수동 트리거로 설계함:
+
+- `save()` — `D._savedAt = Date.now()`, **localStorage 저장만** 함. 구글시트로는 자동으로 안 나감
+- **업로드는 설정 화면의 "지금 업로드" 버튼을 눌러야만** `pushToGas()`가 실행되어 구글시트로 POST됨 (no-cors + text/plain, 응답을 못 읽으므로 성공 여부는 알 수 없고 요청만 보냄)
+- **불러오기**는 앱 시작 시 자동으로 한 번 시도(`loadFromGas(false)`, 로컬이 더 최근이면 무시)하고, 설정 화면의 "지금 불러오기" 버튼을 누르면 `force=true`로 무조건 로컬을 구글시트 내용으로 덮어씀(확인창 있음)
 - GAS URL은 `localStorage`의 `lc_gas_url`에 별도 저장 (공유 데이터와 분리), 설정 화면에서 입력
+- 마지막 업로드 시각은 `localStorage`의 `lc_last_push_at`에 저장해서 설정 화면에 표시
+
+**향후 이 프로젝트를 수정할 때 지켜야 할 것**: `save()`나 다른 로컬 상태 변경 함수 안에 자동 GAS 업로드를 다시 추가하지 말 것. 자동 동기화가 필요하다는 요청이 오면, 이번에 왜 수동으로 바꿨는지(과거 타이밍 버그) 먼저 설명하고 동의를 받은 뒤 진행할 것.
 
 ## 남은 작업 (미착수)
 
