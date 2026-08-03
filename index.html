@@ -697,6 +697,7 @@ function tryDeleteExpense(id){
     D.expenses = D.expenses.filter(function(x){ return x.id !== id; });
     save();
     renderAll();
+    if(gasUrl()) pushToGas(true);
   }
 }
 
@@ -707,6 +708,7 @@ function tryDeleteIncome(id){
     D.income = D.income.filter(function(x){ return x.id !== id; });
     save();
     renderAll();
+    if(gasUrl()) pushToGas(true);
   }
 }
 
