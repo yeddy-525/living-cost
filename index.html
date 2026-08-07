@@ -66,6 +66,10 @@
   .sync-indicator .dot{ width:6px; height:6px; border-radius:50%; background:var(--accent); animation:sync-pulse 1s ease-in-out infinite; }
   @keyframes sync-pulse{ 0%,100%{ opacity:.3; } 50%{ opacity:1; } }
 
+  .ledger-label-row{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .ledger-label-row .total{ font-weight:700; color:var(--ink); white-space:nowrap; }
+  .ledger-label-row .total.over{ color:var(--over); }
+
   .month-nav{ display:flex; align-items:center; justify-content:center; gap:16px; font-size:14px; color:var(--muted); }
   .month-nav .cur{ color:var(--ink); font-weight:700; min-width:100px; text-align:center; }
   .month-nav .arrow{
@@ -511,8 +515,9 @@ function renderLedger(){
   var el = document.getElementById('ledgerCard');
 
   if(!budget){
+    var totalNoBudget = incomeSum - spent;
     el.innerHTML =
-      '<div class="ledger-label">이번 달 예산이 아직 없어요</div>' +
+      '<div class="ledger-label ledger-label-row"><span>이번 달 예산이 아직 없어요</span><span class="total num' + (totalNoBudget < 0 ? ' over' : '') + '">총액 ' + fmtWon(totalNoBudget) + '</span></div>' +
       '<div class="ledger-amt num">' + fmtWon(spent) + '<span class="u">썼어요</span></div>' +
       '<div class="ledger-empty">설정에서 이번 달 예산을 입력하면 게이지가 표시돼요</div>';
     return;
@@ -542,9 +547,10 @@ function renderLedger(){
   if(incomeSum > 0){
     budgetLabel += ' <span style="color:var(--pos);">+ 수입 ' + incomeSum.toLocaleString() + '원</span>';
   }
+  var total = budget + incomeSum - spent; // 통장에 실제 남아있어야 할 금액 (실제 통장 잔액과 맞춰보는 용도)
 
   el.innerHTML =
-    '<div class="ledger-label">' + budgetLabel + '</div>' +
+    '<div class="ledger-label ledger-label-row"><span>' + budgetLabel + '</span><span class="total num' + (total < 0 ? ' over' : '') + '">총액 ' + fmtWon(total) + '</span></div>' +
     '<div class="ledger-amt num">' + fmtWon(spent) + '<span class="u">썼어요</span></div>' +
     badgeHtml +
     '<div class="ledger-track">' +
