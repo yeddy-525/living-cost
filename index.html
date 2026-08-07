@@ -120,6 +120,9 @@
   .chip.on.fixed-on{ background:var(--fixed); border-color:var(--fixed); }
   .chip.on.income-on{ background:var(--pos); border-color:var(--pos); }
 
+  .list-sum{ font-size:12px; color:var(--muted); text-align:right; padding:0 2px; }
+  .list-sum b{ color:var(--ink); font-weight:700; }
+
   .mode-toggle{ display:flex; gap:4px; background:var(--surface-2); border-radius:11px; padding:4px; }
   .mode-btn{
     flex:1; border:none; background:none; color:var(--muted); font-size:12.5px; font-weight:600;
@@ -233,6 +236,8 @@
   <div class="donut-card" id="donutCard"></div>
 
   <div class="chip-row" id="filterChips"></div>
+
+  <div class="list-sum num" id="listSum"></div>
 
   <div class="list" id="expenseList"></div>
 
@@ -662,24 +667,35 @@ function byDateDesc(a,b){ return b.date.localeCompare(a.date) || b.id.localeComp
 
 function renderExpenseList(){
   var el = document.getElementById('expenseList');
+  var sumEl = document.getElementById('listSum');
 
   // "수입" 칩: 수입만 보여줌
   if(activeFilter === '수입'){
     var incomeOnly = incomeForMonth(viewMonth).sort(byDateDesc);
+    var incomeSumFiltered = incomeOnly.reduce(function(s,e){ return s + Number(e.amount||0); }, 0);
+    sumEl.innerHTML = incomeOnly.length ? ('합계 <b>' + fmtWon(incomeSumFiltered) + '</b>') : '';
     el.innerHTML = incomeOnly.length ? incomeOnly.map(incomeRowHtml).join('') : '<div class="list-empty">이번 달 수입 내역이 없어요</div>';
     return;
   }
 
-  // "전체": 지출 + 수입을 날짜순으로 섞어서 보여줌
-  // 특정 카테고리 칩: 그 카테고리 지출만 (수입은 카테고리가 없어서 여기엔 안 나옴)
-  var expenseRows = expensesForMonth(viewMonth).filter(function(e){
+  // "전체": 지출 + 수입을 날짜순으로 섞어서 보여줌 (합계는 안 보여줌 — 이미 예산 카드에 표시됨)
+  // 특정 카테고리 칩: 그 카테고리 지출만 (수입은 카테고리가 없어서 여기엔 안 나옴) — 그 카테고리 합계를 보여줌
+  var filteredExpenses = expensesForMonth(viewMonth).filter(function(e){
     if(activeFilter === 'all') return true;
     return e.cat === activeFilter;
-  }).map(function(e){ return { date: e.date, id: e.id, html: expenseRowHtml(e) }; });
+  });
+  var expenseRows = filteredExpenses.map(function(e){ return { date: e.date, id: e.id, html: expenseRowHtml(e) }; });
 
   var incomeRows = activeFilter === 'all'
     ? incomeForMonth(viewMonth).map(function(e){ return { date: e.date, id: e.id, html: incomeRowHtml(e) }; })
     : [];
+
+  if(activeFilter === 'all'){
+    sumEl.innerHTML = '';
+  } else {
+    var catSum = filteredExpenses.reduce(function(s,e){ return s + Number(e.amount||0); }, 0);
+    sumEl.innerHTML = filteredExpenses.length ? ('합계 <b>' + fmtWon(catSum) + '</b>') : '';
+  }
 
   var rows = expenseRows.concat(incomeRows).sort(byDateDesc);
 
