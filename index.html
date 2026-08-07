@@ -86,11 +86,6 @@
   .ledger-amt .u{ font-size:12px; font-weight:600; color:var(--muted); margin-left:2px; }
   .ledger-track{ position:relative; height:14px; border-radius:8px; background:var(--line-soft); }
   .ledger-fill{ position:absolute; inset:0 auto 0 0; width:0%; border-radius:8px; transition:width 700ms var(--ease-out); }
-  .ledger-tick{ position:absolute; top:-3px; bottom:-3px; width:3px; background:var(--ink); opacity:.65; border-radius:2px; }
-  .ledger-tick::before{
-    content:""; position:absolute; top:-7px; left:50%; transform:translateX(-50%);
-    width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid var(--ink); opacity:.65;
-  }
   .ledger-foot{ display:flex; justify-content:space-between; font-size:11.5px; color:var(--muted-2); }
   .ledger-foot b{ font-weight:700; }
 
@@ -98,9 +93,9 @@
     display:inline-flex; align-items:center; gap:5px; align-self:flex-start;
     font-size:12.5px; font-weight:700; padding:6px 11px; border-radius:100px;
   }
-  .pace-badge.good{ background:color-mix(in srgb, var(--pos) 16%, transparent); color:var(--pos); }
-  .pace-badge.warn{ background:color-mix(in srgb, var(--warn) 18%, transparent); color:var(--warn); }
   .pace-badge.over{ background:color-mix(in srgb, var(--over) 18%, transparent); color:var(--over); }
+  .pace-badge.daily{ background:var(--accent-soft); color:var(--accent-ink); }
+  .pace-badge.daily b{ font-weight:700; }
   .ledger-empty{ font-size:12px; color:var(--muted-2); }
 
   .donut-card{ background:var(--surface); border:1px solid var(--line-soft); border-radius:16px; padding:14px; display:flex; gap:16px; align-items:center; }
@@ -525,22 +520,20 @@ function renderLedger(){
 
   var pct = Math.min(999, Math.round(spent / budget * 100));
   var isCurrentMonth = viewMonth === ym(today);
-  var pace = isCurrentMonth ? Math.round(today.getDate() / daysInMonth(viewMonth) * 100) : null;
 
+  // 날짜 페이스(지난 비율 vs 오늘 날짜 비율) 비교는 고정비처럼 뭉텅이로 나가는 지출이 있으면
+  // 실제 습관과 무관하게 튀어서 "이상하게" 느껴진다는 피드백으로 폐기함(2026-08-07).
+  // 대신 "오늘부터 남은 기간 동안 하루에 얼마씩 쓸 수 있는지"를 그때그때 다시 계산해서 보여줌 —
+  // 판정(빠르다/느리다)이 아니라 정보라서, 고정비가 갑자기 나가서 하루 예산이 훅 줄어도 자연스러움
   var fillColor = 'var(--pos)';
   var badgeHtml = '';
   if(spent > budget){
     fillColor = 'var(--over)';
     badgeHtml = '<div class="pace-badge over">▲ 예산 초과</div>';
-  } else if(pace !== null){
-    var diff = pct - pace;
-    if(diff > 0){
-      fillColor = 'var(--warn)';
-      badgeHtml = '<div class="pace-badge warn">▲ 페이스보다 ' + diff + '%p 빠르게 쓰는 중</div>';
-    } else {
-      fillColor = 'var(--pos)';
-      badgeHtml = '<div class="pace-badge good">▼ 페이스보다 ' + Math.abs(diff) + '%p 여유 있음</div>';
-    }
+  } else if(isCurrentMonth){
+    var daysRemaining = daysInMonth(viewMonth) - today.getDate() + 1;
+    var dailyAllowance = (budget - spent) / daysRemaining;
+    badgeHtml = '<div class="pace-badge daily">오늘부터 하루 <b class="num">' + fmtWon(dailyAllowance) + '</b> 쓸 수 있어요</div>';
   }
 
   var budgetLabel = '이번 달 예산 <span class="num">' + budget.toLocaleString() + '</span>원';
@@ -555,11 +548,10 @@ function renderLedger(){
     badgeHtml +
     '<div class="ledger-track">' +
       '<div class="ledger-fill" style="width:0%; background:' + fillColor + ';" id="ledgerFillEl"></div>' +
-      (pace !== null ? '<div class="ledger-tick" style="left:' + pace + '%;"></div>' : '') +
     '</div>' +
     '<div class="ledger-foot num">' +
       '<span>' + fmtWon(Math.max(0, budget - spent)) + ' 남음</span>' +
-      '<span>' + (pace !== null ? '오늘 기준 ' + pace + '% 지점 · ' : '') + pct + '% 사용</span>' +
+      '<span>' + pct + '% 사용</span>' +
     '</div>';
 
   requestAnimationFrame(function(){
