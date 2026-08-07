@@ -610,7 +610,7 @@ function renderDonut(){
   if(acc < 100) gradParts.push(cssVar('--line') + ' ' + acc + '% 100%');
 
   var legend = data.rows.map(function(r){
-    return '<div class="dl-row"><span class="dot" style="background:' + r.color + ';"></span><span class="name">' + r.label + '</span><span class="pct num">' + r.pct + '%</span></div>';
+    return '<div class="dl-row"><span class="dot" style="background:' + r.color + ';"></span><span class="name">' + r.label + '</span><span class="pct num">' + r.pct + '% · ' + fmtWon(r.amount) + '</span></div>';
   }).join('');
 
   el.innerHTML =
