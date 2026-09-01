@@ -263,7 +263,7 @@
     </div>
     <div class="field">
       <label>금액</label>
-      <input type="number" id="fAmount" class="amt" placeholder="0" inputmode="numeric">
+      <input type="text" id="fAmount" class="amt" placeholder="0" inputmode="numeric" oninput="formatAmountField(this)">
     </div>
     <div class="field">
       <label id="fNameLabel">항목명</label>
@@ -362,6 +362,14 @@ function ym(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2
 function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function daysInMonth(ymStr){ var p=ymStr.split('-'); return new Date(Number(p[0]), Number(p[1]), 0).getDate(); }
 function fmtWon(n){ return Math.round(n).toLocaleString() + '원'; }
+function rawAmount(str){ return Number(String(str||'').replace(/[^0-9]/g,'')); }
+function formatAmountField(el){
+  var digits = el.value.replace(/[^0-9]/g,'');
+  var caretFromEnd = el.value.length - el.selectionEnd;
+  el.value = digits ? Number(digits).toLocaleString() : '';
+  var pos = el.value.length - caretFromEnd;
+  el.setSelectionRange(pos, pos);
+}
 function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
@@ -747,7 +755,7 @@ function openEditExpense(id){
   if(!e) return;
   editingId = id;
   document.getElementById('fDate').value = e.date;
-  document.getElementById('fAmount').value = e.amount;
+  document.getElementById('fAmount').value = Number(e.amount).toLocaleString();
   document.getElementById('fName').value = e.name;
   selectedCat = e.cat;
   selectedSub = e.sub || null;
@@ -764,7 +772,7 @@ function openEditIncome(id){
   if(!e) return;
   editingId = id;
   document.getElementById('fDate').value = e.date;
-  document.getElementById('fAmount').value = e.amount;
+  document.getElementById('fAmount').value = Number(e.amount).toLocaleString();
   document.getElementById('fName').value = e.name || '';
   document.getElementById('modeToggle').style.display = 'none';
   setEntryMode('income');
@@ -814,7 +822,7 @@ function pickSub(c){ selectedSub = c; renderFixedChips(); }
 
 function saveEntry(){
   var date = document.getElementById('fDate').value;
-  var amount = Number(document.getElementById('fAmount').value);
+  var amount = rawAmount(document.getElementById('fAmount').value);
   var name = document.getElementById('fName').value.trim();
 
   if(!date){ alert('날짜를 선택해주세요'); return; }
