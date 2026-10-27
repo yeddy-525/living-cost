@@ -7,6 +7,9 @@
 // (이 파일은 공개 저장소에 올라가므로 키를 코드에 직접 적지 말 것)
 // ─────────────────────────────────────────────────────────────────────────
 
+// 앱이 이 값을 확인해서, 서버가 옛 버전이면 올리지 않고 변경을 기기에 보관함 (새 필드가 조용히 버려지는 사고 방지)
+const SCHEMA = 3
+
 const SH = {
   EXPENSES : 'Expenses',
   INCOME   : 'Income',
@@ -15,13 +18,22 @@ const SH = {
   CATS     : 'Categories',
   CATS_VAR : 'Categories_Variable', // 예전 구조, 이전 데이터를 읽어서 옮길 때만 사용
   CATS_FIX : 'Categories_Fixed',    // 예전 구조, 이전 데이터를 읽어서 옮길 때만 사용
-  SETTINGS : 'Settings'
+  SETTINGS : 'Settings',
+  LEDGER_EXP  : 'Ledger_Expenses',   // 예진/재하/경조사 장부의 지출 (ledger 열로 구분)
+  LEDGER_INC  : 'Ledger_Income',
+  LEDGER_CATS : 'Ledger_Categories',
+  EVENT       : 'Event'              // 경조사통장 설정 (key, value)
 }
+
+const LEDGERS = ['yj', 'jh', 'event']
 
 // sub는 예전 고정비 세부카테고리 열이라 값은 항상 비어 있음 (열 위치를 유지하려고 남겨둠)
 const EXPENSE_COLS = ['id','date','amount','name','cat','sub','pay']
 const INCOME_COLS = ['id','date','amount','name']
 const DEPOSIT_COLS = ['month','yj','jh']
+const LEDGER_EXP_COLS = ['ledger','id','date','amount','name','cat']
+const LEDGER_INC_COLS = ['ledger','id','date','amount','name']
+const LEDGER_CAT_COLS = ['ledger','name']
 
 // 한 번의 업로드로 행 수가 이 비율 미만으로 줄면 오류로 보고 거부함 (빈 데이터로 덮어쓰는 사고 방지)
 const SHRINK_MIN_ROWS = 10
@@ -50,6 +62,9 @@ function doGet(e) {
           variable: readSimpleList(ss, SH.CATS_VAR),
           fixed: readSimpleList(ss, SH.CATS_FIX)
         },
+        ledgers: readLedgers(ss),
+        eventCfg: readEvent(ss),
+        _schema: SCHEMA,
         _savedAt: readSavedAt(ss)
       })
     })
@@ -67,8 +82,11 @@ function doPost(e) {
       const ss = SpreadsheetApp.getActiveSpreadsheet()
       const expenses = D.expenses || []
       const income = D.income || []
+      // 개인/경조사 장부 영역이 들어 있지 않은 업로드(옛 화면)로는 그 시트를 비우지 않음
+      const flat = D.ledgers ? flatLedgers(D.ledgers) : null
 
-      if (shrinks(rowCount(ss, SH.EXPENSES), expenses.length) || shrinks(rowCount(ss, SH.INCOME), income.length)) {
+      if (shrinks(rowCount(ss, SH.EXPENSES), expenses.length) || shrinks(rowCount(ss, SH.INCOME), income.length) ||
+          (flat && (shrinks(rowCount(ss, SH.LEDGER_EXP), flat.exp.length) || shrinks(rowCount(ss, SH.LEDGER_INC), flat.inc.length)))) {
         return json({ ok: false, error: 'shrink' })
       }
 
@@ -77,9 +95,15 @@ function doPost(e) {
       writeBudgets(ss, D.budgets || {})
       writeDeposits(ss, D.deposits || {})
       writeSimpleList(ss, SH.CATS, (D.cats && D.cats.list) || [])
+      if (flat) {
+        writeRows(ss, SH.LEDGER_EXP, flat.exp, LEDGER_EXP_COLS, ['date'])
+        writeRows(ss, SH.LEDGER_INC, flat.inc, LEDGER_INC_COLS, ['date'])
+        writeRows(ss, SH.LEDGER_CATS, flat.cats, LEDGER_CAT_COLS)
+      }
+      if (D.eventCfg) writeEvent(ss, D.eventCfg)
       writeSavedAt(ss, D._savedAt || Date.now())
 
-      return json({ ok: true })
+      return json({ ok: true, _schema: SCHEMA })
     })
   } catch (err) {
     return json({ ok: false, error: err.toString() })
@@ -194,6 +218,62 @@ function writeDeposits(ss, deposits) {
     return { month: m, yj: deposits[m].yj, jh: deposits[m].jh }
   })
   writeRows(ss, SH.DEPOSITS, rows, DEPOSIT_COLS, ['month'])
+}
+
+// ── 개인(yj, jh)/경조사(event) 장부 — 한 시트에 ledger 열로 구분해서 저장 ─────────
+
+function readLedgers(ss) {
+  const out = {}
+  LEDGERS.forEach(function(l) { out[l] = { expenses: [], income: [], cats: [] } })
+
+  readRows(ss, SH.LEDGER_EXP, LEDGER_EXP_COLS).forEach(function(r) {
+    const l = String(r.ledger)
+    if (!out[l]) return
+    out[l].expenses.push({ id: r.id, date: r.date, amount: Number(r.amount) || 0, name: r.name, cat: r.cat })
+  })
+  readRows(ss, SH.LEDGER_INC, LEDGER_INC_COLS).forEach(function(r) {
+    const l = String(r.ledger)
+    if (!out[l]) return
+    out[l].income.push({ id: r.id, date: r.date, amount: Number(r.amount) || 0, name: r.name })
+  })
+  readRows(ss, SH.LEDGER_CATS, LEDGER_CAT_COLS).forEach(function(r) {
+    const l = String(r.ledger)
+    if (out[l]) out[l].cats.push(String(r.name))
+  })
+  return out
+}
+
+function flatLedgers(ledgers) {
+  const exp = [], inc = [], cats = []
+  LEDGERS.forEach(function(l) {
+    const b = ledgers[l] || {}
+    ;(b.expenses || []).forEach(function(e) { exp.push(Object.assign({}, e, { ledger: l })) })
+    ;(b.income || []).forEach(function(e) { inc.push(Object.assign({}, e, { ledger: l })) })
+    ;(b.cats || []).forEach(function(name) { cats.push({ ledger: l, name: name }) })
+  })
+  return { exp: exp, inc: inc, cats: cats }
+}
+
+// ── Event 시트 (경조사통장 설정: 목표 금액, 각자 월 입금액, 실제 잔액으로 맞춘 기준일/기준 잔액) ──
+
+function readEvent(ss) {
+  const m = {}
+  readRows(ss, SH.EVENT, ['key', 'value']).forEach(function(r) { m[String(r.key)] = r.value })
+  return {
+    target: Number(m.target) || 0,
+    each: Number(m.each) || 0,
+    anchor: { date: m.anchorDate ? String(m.anchorDate) : '', balance: Number(m.anchorBalance) || 0 }
+  }
+}
+
+function writeEvent(ss, cfg) {
+  const a = cfg.anchor || {}
+  writeRows(ss, SH.EVENT, [
+    { key: 'target', value: cfg.target || 0 },
+    { key: 'each', value: cfg.each || 0 },
+    { key: 'anchorDate', value: a.date || '' },
+    { key: 'anchorBalance', value: a.balance || 0 }
+  ], ['key', 'value'], ['value'])
 }
 
 // ── Categories 시트 (name 한 컬럼짜리 단순 리스트) ─────────────────────────
