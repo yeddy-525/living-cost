@@ -1189,7 +1189,7 @@ function pickPay(p){ selectedPay = p; renderPayPicker(); }
 
 // ── 항목명 자동완성 ─────────────────────────────────────────────────────
 // 지금 보고 있는 장부에 입력했던 항목명에서 고름. 같은 이름이 여러 번 있으면 가장 최근 입력의 금액·카테고리·결제수단을 씀.
-// 새 지출을 추가할 때만 보여줌 (수정 중이거나 수입일 때는 숨김)
+// 새 지출을 추가할 때, 항목명에 글자를 입력한 뒤에만 보여줌 (수정 중이거나 수입일 때, 입력 전에는 숨김)
 var suggestList = [];
 function normName(s){ return String(s == null ? '' : s).replace(/\s+/g, '').toLowerCase(); }
 
@@ -1204,10 +1204,10 @@ function nameSuggestions(query){
   });
   var q = normName(query);
   return Object.keys(seen)
-    .filter(function(k){ return !q || k.indexOf(q) >= 0; })
+    .filter(function(k){ return k.indexOf(q) >= 0; })
     .map(function(k){ return { key: k, n: seen[k].n, last: seen[k].last }; })
     .sort(function(a,b){
-      var as = q && a.key.indexOf(q) === 0 ? 1 : 0, bs = q && b.key.indexOf(q) === 0 ? 1 : 0; // 입력한 글자로 시작하는 이름 먼저
+      var as = a.key.indexOf(q) === 0 ? 1 : 0, bs = b.key.indexOf(q) === 0 ? 1 : 0; // 입력한 글자로 시작하는 이름 먼저
       return (bs - as) || (b.n - a.n) || b.last.date.localeCompare(a.last.date);                // 그다음 자주 쓴 순, 최근 순
     })
     .slice(0, 5)
@@ -1216,7 +1216,7 @@ function nameSuggestions(query){
 
 function renderSuggestions(){
   var box = el('nameSuggest');
-  if(editingId || entryMode !== 'expense'){ suggestList = []; box.innerHTML = ''; return; }
+  if(editingId || entryMode !== 'expense' || !normName(el('fName').value)){ suggestList = []; box.innerHTML = ''; return; }
   suggestList = nameSuggestions(el('fName').value);
   box.innerHTML = suggestList.map(function(e, i){
     return '<span class="chip dashed sug" onclick="applySuggestion(' + i + ')">' + escapeHtml(e.name) + ' <span class="num">' + Number(e.amount).toLocaleString() + '</span></span>';
