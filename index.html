@@ -18,8 +18,8 @@
     --fixed:#6a63c4; --fixed-soft:#a29bdb;
     --shadow:rgba(28,40,35,.10);
     --ease-out:cubic-bezier(.16,1,.3,1);
-    --cc1:#0f8f82; --cc2:#e2707a; --cc3:#e0a63a; --cc4:#8b95a8; --cc5:#2fa66b; --cc6:#3a8fc9;
-    --fc1:#6a63c4; --fc2:#a29bdb; --fc3:#8f7fd1; --fc4:#4f4790; --fc5:#b6aee0;
+    --cc1:#0f8f82; --cc2:#e2707a; --cc3:#e0a63a; --cc4:#6a63c4; --cc5:#2fa66b; --cc6:#3a8fc9; --cc7:#c75fa8; --cc8:#8b95a8;
+    --cc9:#d2753a; --cc10:#7a9a2e; --cc11:#9b6b4f; --cc12:#b04a5e; --cc13:#a07ad0; --cc14:#c4a15a; --cc15:#3c7a5a; --cc16:#d98f9e;
   }
   @media (prefers-color-scheme: dark){
     :root{
@@ -30,8 +30,8 @@
       --pos:#5fd591; --warn:#f0a24f; --over:#f07a6d;
       --fixed:#a29bff; --fixed-soft:#7d76c9;
       --shadow:rgba(0,0,0,.38);
-      --cc1:#3fd9c7; --cc2:#f2909a; --cc3:#f0c15a; --cc4:#a7b0c2; --cc5:#5fd591; --cc6:#6fb4ec;
-      --fc1:#a29bff; --fc2:#7d76c9; --fc3:#9a8fe0; --fc4:#6b5fc0; --fc5:#c3bcff;
+      --cc1:#3fd9c7; --cc2:#f2909a; --cc3:#f0c15a; --cc4:#a29bff; --cc5:#5fd591; --cc6:#6fb4ec; --cc7:#e68ac8; --cc8:#a7b0c2;
+      --cc9:#f0a06a; --cc10:#a9c85a; --cc11:#c9987a; --cc12:#e07f93; --cc13:#c4a3ee; --cc14:#e3c98a; --cc15:#6fbf95; --cc16:#f0b6c2;
     }
   }
 
@@ -237,6 +237,8 @@
 
   <div class="chip-row" id="filterChips"></div>
 
+  <div class="chip-row" id="payChips"></div>
+
   <div class="list-sum num" id="listSum"></div>
 
   <div class="list" id="expenseList"></div>
@@ -273,11 +275,11 @@
       <label>카테고리</label>
       <div class="chip-row" id="varChipRow"></div>
     </div>
-    <div class="fixed-reveal" id="fixedReveal" style="display:none;">
-      <label>고정비 세부카테고리</label>
-      <div class="chip-row" id="fixedChipRow"></div>
+    <div class="field" id="payField">
+      <label>결제수단</label>
+      <div class="chip-row" id="payChipRow"></div>
     </div>
-    <div class="hint" id="incomeHint" style="display:none;">이번 달 예산에 그대로 더해져요 (생활비통장에 합쳐지는 돈)</div>
+    <div class="hint" id="incomeHint" style="display:none;">예산에는 포함되지 않고, 상단 총액에만 더해져요 (생활비통장에 합쳐지는 돈)</div>
 
     <button class="btn-primary" onclick="saveEntry()">저장</button>
   </div>
@@ -291,35 +293,33 @@
     <div class="sheet-title"><span>설정</span><span class="sheet-close" onclick="closeSettings()">닫기</span></div>
 
     <div class="settings-sec">
-      <div class="title" id="budgetTitle">이번 달 예산</div>
-      <div class="field"><input type="number" id="fBudget" class="amt" placeholder="0" inputmode="numeric" onchange="saveBudget()"></div>
-      <div class="hint">보고 있는 달 기준으로 설정돼요</div>
+      <div class="title" id="budgetTitle">이번 달 입금</div>
+      <div class="field"><label>예진</label><input type="number" id="fDepYj" class="amt" placeholder="0" inputmode="numeric" onchange="saveDeposit()"></div>
+      <div class="field"><label>재하</label><input type="number" id="fDepJh" class="amt" placeholder="0" inputmode="numeric" onchange="saveDeposit()"></div>
+      <div class="hint" id="depHint">두 사람 입금액의 합이 이번 달 예산이에요 (보고 있는 달 기준)</div>
     </div>
 
     <div class="settings-sec">
-      <div class="title">변동비 카테고리</div>
-      <div id="varCatList"></div>
-      <button class="add-row" onclick="addCategory('variable')">+ 카테고리 추가</button>
+      <div class="title">카테고리</div>
+      <div id="catList"></div>
+      <button class="add-row" onclick="addCategory()">+ 카테고리 추가</button>
     </div>
 
     <div class="settings-sec">
-      <div class="title">고정비 세부카테고리</div>
-      <div id="fixedCatList"></div>
-      <button class="add-row" onclick="addCategory('fixed')">+ 세부카테고리 추가</button>
-    </div>
-
-    <div class="settings-sec">
-      <div class="title">구글시트 동기화 (선택)</div>
+      <div class="title">구글시트 동기화</div>
       <div class="sync-row">
         <input type="text" id="fGasUrl" placeholder="GAS 웹앱 URL 붙여넣기">
-        <button class="btn-primary" style="width:auto; padding:0 14px;" onclick="saveGasUrl()">URL 저장</button>
       </div>
       <div class="sync-row">
-        <button class="btn-primary" id="btnPush" style="background:var(--accent);" onclick="pushToGas()">지금 업로드</button>
-        <button class="btn-primary" id="btnPull" style="background:var(--muted-2);" onclick="pullFromGas()">지금 불러오기</button>
+        <input type="password" id="fGasKey" placeholder="공유 키 (두 사람이 같은 값)" autocomplete="off">
+        <button class="btn-primary" style="width:auto; padding:0 14px;" onclick="saveGasUrl()">저장</button>
+      </div>
+      <div class="sync-row">
+        <button class="btn-primary" id="btnPush" style="background:var(--accent);" onclick="manualPush()">지금 업로드</button>
+        <button class="btn-primary" id="btnPull" style="background:var(--muted-2);" onclick="manualPull()">지금 불러오기</button>
       </div>
       <div class="sync-status" id="syncStatus">동기화 안 됨 (로컬에만 저장)</div>
-      <div class="hint">자동으로 올라가지 않아요 — 다른 기기와 맞추고 싶을 때 직접 눌러야 반영돼요</div>
+      <div class="hint">저장하면 바로 올라가요. 올라가지 못한 변경은 이 기기에 남아 있다가 다음에 다시 올려요</div>
     </div>
 
   </div>
@@ -332,30 +332,30 @@
 var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzKKbZkEZL6T0I1NRdQQZX6bUAFDR8POHyDodR_PaxSdyk0lVRmUdruQj79_mE7B-dt/exec';
 var STORAGE_KEY = 'lc_data';
 var GAS_URL_KEY = 'lc_gas_url';
+var GAS_KEY_KEY = 'lc_gas_key';
+var PENDING_KEY = 'lc_pending';
+var SYNCED_KEY = 'lc_synced';
+var LAST_PAY_KEY = 'lc_last_pay';
 
-var VAR_COLOR_VARS = ['--cc1','--cc2','--cc3','--cc4','--cc5','--cc6'];
-var FIXED_COLOR_VARS = ['--fc1','--fc2','--fc3','--fc4','--fc5'];
+var COLOR_COUNT = 16; // --cc1..--cc16
+var DEFAULT_CATS = ['주거','공과금','식비','생필품','의류·취미','교통비','구독료','폰요금','보험','의료비','경조사','선물','저축','기타'];
+// 예전 카테고리를 새 목록으로 옮길 때의 이름 변환. 여기에 없는 이름(예: 데이트)은 그대로 목록에 추가됨
+var CAT_RENAME = { '월세':'주거', '관리비':'주거', '교통':'교통비', '기타고정비':'기타' };
+var PAYS = ['신용카드','체크카드','현금','계좌이체'];
 
 // ── 상태 ────────────────────────────────────────────────────────────────
-var D = load() || {
-  expenses: [],
-  income: [],
-  budgets: {},
-  cats: {
-    variable: ['식비','생필품','데이트','교통','기타'],
-    fixed: ['월세','관리비','구독료','보험','기타고정비']
-  },
-  _savedAt: 0
-};
-if(!D.income) D.income = []; // 기존에 저장된 데이터엔 없을 수 있어서 보정
+var D = normalize(load() || {});
+var pending = loadPending(); // 아직 구글시트에 확인되지 않은 변경 목록 (기기에 저장됨)
 
 var today = new Date();
 var viewMonth = ym(today);
 var activeFilter = 'all';
+var activePay = 'all';
 var entryMode = 'expense';
 var editingId = null; // null이면 새 항목 추가, 값이 있으면 해당 id의 항목을 수정 중
 var selectedCat = null;
-var selectedSub = null;
+var selectedPay = null;
+var lastPullAt = 0;
 
 // ── 유틸 ────────────────────────────────────────────────────────────────
 function ym(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
@@ -372,6 +372,9 @@ function formatAmountField(el){
 }
 function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function escapeHtml(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
+// onclick 등 속성 안에 이름을 넣을 때 사용 (따옴표가 들어간 이름이 속성을 깨지 않게)
+function attr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function monthLabel(ymStr){
   var p = ymStr.split('-');
@@ -383,6 +386,7 @@ function shiftMonth(delta){
   var d = new Date(Number(p[0]), Number(p[1]) - 1 + delta, 1);
   viewMonth = ym(d);
   activeFilter = 'all';
+  activePay = 'all';
   renderAll();
 }
 
@@ -396,53 +400,197 @@ function incomeForMonth(ymStr){
 
 function budgetForMonth(ymStr){ return D.budgets[ymStr] || 0; }
 
+// ── 데이터 정리 (옛 구조 → 새 구조) ───────────────────────────────────────
+// 로컬 저장본과 구글시트에서 받은 데이터 모두 이 함수를 거침. 이미 새 구조면 아무것도 바꾸지 않음
+function normalize(d){
+  d = d || {};
+  d.expenses = d.expenses || [];
+  d.income = d.income || [];
+  d.budgets = d.budgets || {};
+  d.deposits = d.deposits || {};
+  var c = d.cats || {};
+  if(!(c.list && c.list.length)){
+    // 예전 구조(변동비 목록 + 고정비 세부카테고리)를 하나의 목록으로 합침
+    d.expenses.forEach(function(e){
+      if(e.cat === '고정비') e.cat = e.sub || '기타고정비';
+      e.cat = CAT_RENAME[e.cat] || e.cat;
+    });
+    var list = DEFAULT_CATS.slice();
+    (c.variable || []).concat(c.fixed || []).forEach(function(n){
+      var m = CAT_RENAME[n] || n;
+      if(list.indexOf(m) < 0) list.push(m);
+    });
+    c = { list: list };
+  }
+  d.cats = { list: c.list };
+  d.expenses.forEach(function(e){
+    if(e.pay == null) e.pay = '';
+    if(e.sub == null) e.sub = '';
+  });
+  d._savedAt = d._savedAt || 0;
+  return d;
+}
+
+// ── 변경 기록과 적용 ──────────────────────────────────────────────────────
+// 모든 변경은 "변경 기록(op)"으로 남김. 구글시트에 올릴 때는 최신 데이터를 받아서 그 위에 이 기록들을 다시 적용하므로,
+// 앱을 오래 열어둔 상태에서 저장해도 상대가 그사이 입력한 내역을 덮어쓰지 않음
+function upsert(arr, item){
+  var i = arr.findIndex(function(x){ return x.id === item.id; });
+  if(i >= 0) arr[i] = item; else arr.push(item);
+}
+
+function applyOp(d, op){
+  if(op.t === 'ex') upsert(d.expenses, op.item);
+  else if(op.t === 'exDel') d.expenses = d.expenses.filter(function(x){ return x.id !== op.id; });
+  else if(op.t === 'in') upsert(d.income, op.item);
+  else if(op.t === 'inDel') d.income = d.income.filter(function(x){ return x.id !== op.id; });
+  else if(op.t === 'dep'){
+    if(op.yj || op.jh){ d.deposits[op.ym] = { yj: op.yj, jh: op.jh }; d.budgets[op.ym] = op.yj + op.jh; }
+    else { delete d.deposits[op.ym]; d.budgets[op.ym] = 0; }
+  }
+  else if(op.t === 'bud'){ if(!d.deposits[op.ym]) d.budgets[op.ym] = op.v; } // 예전 방식의 월 예산 (입금액 없는 달만)
+  else if(op.t === 'cats') d.cats.list = op.list.slice(); // 옛 데이터를 처음 올릴 때(seedPending)만 사용
+  else if(op.t === 'catAdd'){ if(d.cats.list.indexOf(op.name) < 0) d.cats.list.push(op.name); }
+  else if(op.t === 'catDel') d.cats.list = d.cats.list.filter(function(c){ return c !== op.name; });
+}
+
+// 변경 한 건을 적용·저장하고 구글시트에 올림. 입력이 막힌 상태면 false
+function commit(op){
+  if(!canEdit()) return false;
+  applyOp(D, op);
+  pending.push(op);
+  save();
+  renderAll();
+  flush();
+  return true;
+}
+
 // ── 저장 / 동기화 ─────────────────────────────────────────────────────────
 function save(){
   D._savedAt = Date.now();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(D));
-  // 구글시트 업로드는 자동으로 하지 않음 — 설정 화면의 "지금 업로드" 버튼을 눌러야만 나감
-  // (자동 동기화가 타이밍 버그를 일으킨 전례가 있어서, 이번엔 처음부터 수동 트리거로 설계함)
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(D));
+    localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+  }catch(e){}
 }
 function load(){
   try{ var raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; }
   catch(e){ return null; }
 }
+function loadPending(){
+  try{ return JSON.parse(localStorage.getItem(PENDING_KEY)) || []; }
+  catch(e){ return []; }
+}
 function gasUrl(){ return localStorage.getItem(GAS_URL_KEY) || DEFAULT_GAS_URL; }
+function gasKey(){ return localStorage.getItem(GAS_KEY_KEY) || ''; }
 function lastPushAt(){ return Number(localStorage.getItem('lc_last_push_at')) || 0; }
 
-function saveGasUrl(){
-  var v = document.getElementById('fGasUrl').value.trim();
-  localStorage.setItem(GAS_URL_KEY, v);
-  renderSyncStatus();
+// 구글시트에서 한 번도 최신 데이터를 받아온 적 없는 기기는 입력을 막음
+// (빈 데이터로 시작한 기기가 구글시트를 덮어쓰는 사고 방지). 이미 한 번 받아온 기기는 연결이 끊겨도 입력할 수 있음
+function canEdit(){
+  if(!gasUrl() || localStorage.getItem(SYNCED_KEY)) return true;
+  alert('구글시트에서 최신 데이터를 먼저 불러와야 입력할 수 있어요. 잠시 후 다시 시도하거나, 설정에서 주소와 공유 키를 확인해주세요.');
+  return false;
 }
 
-// 업로드: 지출/수입을 저장할 때(quiet=true, 상단 표시) 또는 설정의
-// "지금 업로드" 버튼(quiet=false, 버튼 자체에 표시)을 눌렀을 때만 실행됨.
-// 자동 디바운스/타이머 트리거는 없음 — 매번 사용자의 명시적인 저장 행동에 바로 이어서만 나감
-function pushToGas(quiet){
-  var url = gasUrl();
-  if(!url){
-    if(!quiet) alert('먼저 GAS 웹앱 URL을 입력하고 저장해주세요');
-    return;
-  }
-  var btn = quiet ? null : document.getElementById('btnPush');
-  if(btn){ btn.textContent = '업로드 중...'; btn.disabled = true; }
-  if(quiet) setSyncIndicator('<span class="dot"></span>구글시트에 업로드 중...');
+function saveGasUrl(){
+  localStorage.setItem(GAS_URL_KEY, document.getElementById('fGasUrl').value.trim());
+  localStorage.setItem(GAS_KEY_KEY, document.getElementById('fGasKey').value.trim());
+  localStorage.removeItem(SYNCED_KEY); // 주소나 키가 바뀌면 다시 받아오기 전까지 입력을 막음
+  renderSyncStatus();
+  pull().catch(function(e){ setSyncIndicator(syncErrorText(e), true); });
+}
 
-  fetch(url, {
-    method:'POST', mode:'no-cors',
-    headers:{ 'Content-Type':'text/plain' },
-    body: JSON.stringify(D)
-  }).then(function(){
-    localStorage.setItem('lc_last_push_at', String(Date.now()));
-    renderSyncStatus();
-    if(quiet) setSyncIndicator('구글시트에 저장했어요', true);
-  }).catch(function(){
-    if(!quiet) alert('업로드에 실패했어요. GAS 배포 URL이 맞는지 확인해주세요.');
-    else setSyncIndicator('구글시트 업로드 실패 (연결 확인)', true);
-  }).finally(function(){
-    if(btn){ btn.textContent = '지금 업로드'; btn.disabled = false; }
+function timedFetch(url, opts){
+  var ctrl = new AbortController();
+  var t = setTimeout(function(){ ctrl.abort(); }, 30000);
+  opts = opts || {};
+  opts.signal = ctrl.signal;
+  return fetch(url, opts).then(function(r){ clearTimeout(t); return r.json(); }, function(e){ clearTimeout(t); throw e; });
+}
+
+function fetchRemote(){
+  var url = gasUrl() + (gasUrl().indexOf('?') >= 0 ? '&' : '?') + 'key=' + encodeURIComponent(gasKey());
+  return timedFetch(url).then(function(r){
+    if(!r || r.error || !r.expenses) throw new Error((r && r.error) || 'bad response');
+    return normalize(r);
   });
+}
+
+function postRemote(d){
+  var body = JSON.stringify(Object.assign({}, d, { _key: gasKey() }));
+  return timedFetch(gasUrl(), { method:'POST', headers:{ 'Content-Type':'text/plain' }, body: body }).then(function(r){
+    if(!r || !r.ok) throw new Error((r && r.error) || 'bad response');
+  });
+}
+
+function syncErrorText(e){
+  var m = e && e.message;
+  if(m === 'unauthorized') return '공유 키가 맞지 않아요 (설정에서 확인)';
+  if(m === 'shrink') return '데이터가 크게 줄어서 업로드를 막았어요';
+  return '구글시트 연결 실패 (변경은 이 기기에 남아 있어요)';
+}
+
+// 올리기: 최신 데이터를 받아서 → 대기 중인 변경을 그 위에 적용하고 → 올림. 동시에 하나만 실행하고, 실행 중에 쌓인 변경은 끝난 뒤 이어서 올림
+var flushP = null, flushAgain = false;
+function flush(){
+  if(!gasUrl() || !pending.length) return Promise.resolve();
+  if(flushP){ flushAgain = true; return flushP; }
+  flushP = runFlush().then(function(){
+    flushP = null;
+    if(flushAgain){ flushAgain = false; return flush(); }
+  });
+  return flushP;
+}
+
+function runFlush(){
+  var sent = pending.length;
+  setSyncIndicator('<span class="dot"></span>구글시트에 업로드 중...');
+  return fetchRemote().then(function(base){
+    pending.slice(0, sent).forEach(function(op){ applyOp(base, op); });
+    base._savedAt = Date.now();
+    return postRemote(base).then(function(){
+      pending = pending.slice(sent);
+      D = base;
+      pending.forEach(function(op){ applyOp(D, op); }); // 올리는 동안 새로 쌓인 변경은 화면에 계속 보이게 다시 적용
+      localStorage.setItem(SYNCED_KEY, '1');
+      localStorage.setItem('lc_last_push_at', String(Date.now()));
+      save();
+      renderAll();
+      renderSyncStatus();
+      setSyncIndicator('구글시트에 저장했어요', true);
+    });
+  }).catch(function(e){
+    setSyncIndicator(syncErrorText(e), true);
+    renderSyncStatus();
+  });
+}
+
+// 불러오기: 대기 중인 변경은 그대로 유지한 채 구글시트 최신 데이터를 반영함 (앱을 열 때, 화면에 다시 돌아올 때, 버튼을 눌렀을 때)
+function pull(){
+  if(!gasUrl()) return Promise.resolve();
+  if(flushP) return flushP;
+  lastPullAt = Date.now();
+  return fetchRemote().then(function(remote){
+    // 새 버전으로 처음 여는 기기에 아직 올리지 못한 로컬 변경이 있으면 대기 목록에 넣어서 잃지 않게 함
+    if(!localStorage.getItem(SYNCED_KEY) && !pending.length && (D.expenses.length || D.income.length) && (D._savedAt || 0) > (remote._savedAt || 0)){
+      seedPending();
+    }
+    D = remote;
+    pending.forEach(function(op){ applyOp(D, op); });
+    localStorage.setItem(SYNCED_KEY, '1');
+    save();
+    renderAll();
+    renderSyncStatus();
+    if(pending.length) flush();
+  });
+}
+
+function seedPending(){
+  D.expenses.forEach(function(e){ pending.push({ t:'ex', item:e }); });
+  D.income.forEach(function(e){ pending.push({ t:'in', item:e }); });
+  Object.keys(D.budgets).forEach(function(m){ pending.push({ t:'bud', ym:m, v:D.budgets[m] }); });
+  pending.push({ t:'cats', list:D.cats.list.slice() });
 }
 
 function setSyncIndicator(html, autoHide){
@@ -457,44 +605,21 @@ function setSyncIndicator(html, autoHide){
   }
 }
 
-// 불러오기: force=true(버튼)면 로컬을 무조건 구글시트 내용으로 덮어씀
-// 앱 시작 시에는 force=false로 호출 — 로컬이 더 최근이면 덮어쓰지 않음
-// isInitial=true면 상단 "동기화 확인 중" 표시를 띄우고 결과를 알려줌
-function loadFromGas(force, isInitial){
-  var url = gasUrl();
-  if(!url) return;
-  if(force){
-    var btn = document.getElementById('btnPull');
-    if(btn){ btn.textContent = '불러오는 중...'; btn.disabled = true; }
-  }
-  if(isInitial) setSyncIndicator('<span class="dot"></span>동기화 확인 중...');
-
-  fetch(url).then(function(r){ return r.json(); }).then(function(remote){
-    if(!remote || remote.error || !remote.expenses){
-      if(isInitial) setSyncIndicator('동기화 확인 실패', true);
-      return;
-    }
-    var applied = force || (remote._savedAt||0) > (D._savedAt||0);
-    if(applied){
-      D = remote;
-      if(!D.income) D.income = [];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(D));
-      renderAll();
-    }
-    if(isInitial) setSyncIndicator(applied ? '구글시트 최신 데이터 반영했어요' : '이미 최신 상태예요', true);
-  }).catch(function(){
-    if(force) alert('불러오기에 실패했어요. GAS 배포 URL이 맞는지 확인해주세요.');
-    if(isInitial) setSyncIndicator('동기화 확인 실패 (연결 안 됨)', true);
-  }).finally(function(){
-    var btn = document.getElementById('btnPull');
-    if(btn){ btn.textContent = '지금 불러오기'; btn.disabled = false; renderSyncStatus(); }
-  });
+function manualPush(){
+  if(!gasUrl()){ alert('먼저 GAS 웹앱 URL을 입력하고 저장해주세요'); return; }
+  if(!pending.length){ alert('올릴 변경사항이 없어요'); return; }
+  var btn = document.getElementById('btnPush');
+  btn.textContent = '업로드 중...'; btn.disabled = true;
+  flush().then(function(){
+    if(pending.length) alert('업로드에 실패했어요. 주소와 공유 키를 확인해주세요.');
+  }).finally(function(){ btn.textContent = '지금 업로드'; btn.disabled = false; renderSyncStatus(); });
 }
 
-function pullFromGas(){
+function manualPull(){
   if(!gasUrl()){ alert('먼저 GAS 웹앱 URL을 입력하고 저장해주세요'); return; }
-  if(!confirm('구글시트 내용으로 덮어쓸까요? 아직 업로드 안 한 로컬 변경사항은 사라져요.')) return;
-  loadFromGas(true);
+  var btn = document.getElementById('btnPull');
+  btn.textContent = '불러오는 중...'; btn.disabled = true;
+  pull().catch(function(e){ alert(syncErrorText(e)); }).finally(function(){ btn.textContent = '지금 불러오기'; btn.disabled = false; });
 }
 
 function renderSyncStatus(){
@@ -502,7 +627,9 @@ function renderSyncStatus(){
   if(!el) return;
   if(!gasUrl()){ el.textContent = '동기화 안 됨 (로컬에만 저장)'; return; }
   var t = lastPushAt();
-  el.textContent = t ? ('마지막 업로드: ' + new Date(t).toLocaleString('ko-KR')) : '아직 업로드한 적 없어요';
+  var s = t ? ('마지막 업로드: ' + new Date(t).toLocaleString('ko-KR')) : '아직 업로드한 적 없어요';
+  if(pending.length) s += ' · 올리지 못한 변경 ' + pending.length + '건';
+  el.textContent = s;
 }
 
 // ── 렌더 ────────────────────────────────────────────────────────────────
@@ -511,6 +638,7 @@ function renderAll(){
   renderLedger();
   renderDonut();
   renderFilterChips();
+  renderPayChips();
   renderExpenseList();
 }
 
@@ -525,9 +653,9 @@ function renderLedger(){
   if(!budget){
     var totalNoBudget = incomeSum - spent;
     el.innerHTML =
-      '<div class="ledger-label ledger-label-row"><span>이번 달 예산이 아직 없어요</span><span class="total num' + (totalNoBudget < 0 ? ' over' : '') + '">총액 ' + fmtWon(totalNoBudget) + '</span></div>' +
+      '<div class="ledger-label ledger-label-row"><span>이번 달 입금액이 아직 없어요</span><span class="total num' + (totalNoBudget < 0 ? ' over' : '') + '">총액 ' + fmtWon(totalNoBudget) + '</span></div>' +
       '<div class="ledger-amt num">' + fmtWon(spent) + '<span class="u">썼어요</span></div>' +
-      '<div class="ledger-empty">설정에서 이번 달 예산을 입력하면 게이지가 표시돼요</div>';
+      '<div class="ledger-empty">설정에서 이번 달 입금액을 입력하면 게이지가 표시돼요</div>';
     return;
   }
 
@@ -554,9 +682,12 @@ function renderLedger(){
     budgetLabel += ' <span style="color:var(--pos);">+ 수입 ' + incomeSum.toLocaleString() + '원</span>';
   }
   var total = budget + incomeSum - spent; // 통장에 실제 남아있어야 할 금액 (실제 통장 잔액과 맞춰보는 용도)
+  var dep = D.deposits[viewMonth];
+  var depHtml = dep ? '<div class="ledger-label num">입금 예진 ' + dep.yj.toLocaleString() + '원 + 재하 ' + dep.jh.toLocaleString() + '원</div>' : '';
 
   el.innerHTML =
     '<div class="ledger-label ledger-label-row"><span>' + budgetLabel + '</span><span class="total num' + (total < 0 ? ' over' : '') + '">총액 ' + fmtWon(total) + '</span></div>' +
+    depHtml +
     '<div class="ledger-amt num">' + fmtWon(spent) + '<span class="u">썼어요</span></div>' +
     badgeHtml +
     '<div class="ledger-track">' +
@@ -573,37 +704,23 @@ function renderLedger(){
   });
 }
 
-function catColor(name, isFixed, idx){
-  var vars = isFixed ? FIXED_COLOR_VARS : VAR_COLOR_VARS;
-  return cssVar(vars[idx % vars.length]);
+// 색상은 카테고리 목록의 순서(index)로 결정됨. 목록에 없는(삭제된) 카테고리의 옛 지출은 회색으로 표시
+function catColor(name){
+  var idx = D.cats.list.indexOf(name);
+  return idx < 0 ? cssVar('--muted-2') : cssVar('--cc' + (idx % COLOR_COUNT + 1));
 }
 
 function categoryBreakdown(){
   var list = expensesForMonth(viewMonth);
   var total = list.reduce(function(s,e){ return s + Number(e.amount||0); }, 0);
   var buckets = {};
-  var order = [];
+  list.forEach(function(e){ buckets[e.cat] = (buckets[e.cat] || 0) + Number(e.amount||0); });
 
-  list.forEach(function(e){
-    var isFixed = e.cat === '고정비';
-    var label = isFixed ? (e.sub || '기타고정비') : e.cat;
-    var key = (isFixed?'F:':'V:') + label;
-    if(!buckets[key]){
-      buckets[key] = { label:label, amount:0, isFixed:isFixed };
-      order.push(key);
-    }
-    buckets[key].amount += Number(e.amount||0);
-  });
-
-  var varCats = D.cats.variable, fixedCats = D.cats.fixed;
-  var result = order.map(function(key){
-    var b = buckets[key];
-    var idx = b.isFixed ? fixedCats.indexOf(b.label) : varCats.indexOf(b.label);
-    if(idx < 0) idx = 0;
-    return { label:b.label, amount:b.amount, isFixed:b.isFixed, pct: total? Math.round(b.amount/total*100):0, color: catColor(b.label, b.isFixed, idx) };
+  var rows = Object.keys(buckets).map(function(label){
+    return { label:label, amount:buckets[label], pct: total ? Math.round(buckets[label]/total*100) : 0, color: catColor(label) };
   }).sort(function(a,b){ return b.amount - a.amount; });
 
-  return { total:total, rows:result };
+  return { total:total, rows:rows };
 }
 
 function renderDonut(){
@@ -613,17 +730,17 @@ function renderDonut(){
     el.innerHTML = '<div class="donut-empty">아직 이번 달 지출이 없어요</div>';
     return;
   }
+  // 조각 경계는 반올림하지 않은 비율로 계산해야 합이 100%를 넘지 않음
   var gradParts = [];
   var acc = 0;
   data.rows.forEach(function(r){
     var start = acc;
-    acc += r.pct;
+    acc += r.amount / data.total * 100;
     gradParts.push(r.color + ' ' + start + '% ' + acc + '%');
   });
-  if(acc < 100) gradParts.push(cssVar('--line') + ' ' + acc + '% 100%');
 
   var legend = data.rows.map(function(r){
-    return '<div class="dl-row"><span class="dot" style="background:' + r.color + ';"></span><span class="name">' + r.label + '</span><span class="pct num">' + r.pct + '% · ' + fmtWon(r.amount) + '</span></div>';
+    return '<div class="dl-row"><span class="dot" style="background:' + r.color + ';"></span><span class="name">' + escapeHtml(r.label) + '</span><span class="pct num">' + r.pct + '% · ' + fmtWon(r.amount) + '</span></div>';
   }).join('');
 
   el.innerHTML =
@@ -631,28 +748,40 @@ function renderDonut(){
     '<div class="donut-legend">' + legend + '</div>';
 }
 
+// 필터 칩에는 카테고리 목록과, 목록엔 없지만 이번 달 지출에 쓰인 카테고리(삭제된 것)도 함께 보여줌
 function renderFilterChips(){
   var el = document.getElementById('filterChips');
+  var names = D.cats.list.slice();
+  expensesForMonth(viewMonth).forEach(function(e){ if(names.indexOf(e.cat) < 0) names.push(e.cat); });
   var chips = ['<span class="chip ' + (activeFilter==='all'?'on':'') + '" onclick="setFilter(\'all\')">전체</span>'];
-  D.cats.variable.forEach(function(c){
-    chips.push('<span class="chip ' + (activeFilter===c?'on':'') + '" onclick="setFilter(\'' + c + '\')">' + c + '</span>');
+  names.forEach(function(c){
+    chips.push('<span class="chip ' + (activeFilter===c?'on':'') + '" data-n="' + attr(c) + '" onclick="setFilter(this.dataset.n)">' + escapeHtml(c) + '</span>');
   });
-  chips.push('<span class="chip dashed ' + (activeFilter==='고정비'?'on fixed-on':'') + '" onclick="setFilter(\'고정비\')">고정비</span>');
   chips.push('<span class="chip ' + (activeFilter==='수입'?'on income-on':'') + '" onclick="setFilter(\'수입\')">수입</span>');
   el.innerHTML = chips.join('');
 }
 
 function setFilter(f){ activeFilter = f; renderFilterChips(); renderExpenseList(); }
 
+// 결제수단별 이번 달 합계. 칩을 누르면 그 결제수단 지출만 목록에 보여줌
+function renderPayChips(){
+  var el = document.getElementById('payChips');
+  var sums = {};
+  expensesForMonth(viewMonth).forEach(function(e){
+    var p = e.pay || '미지정';
+    sums[p] = (sums[p] || 0) + Number(e.amount||0);
+  });
+  el.innerHTML = PAYS.concat(['미지정']).filter(function(p){ return sums[p]; }).map(function(p){
+    return '<span class="chip ' + (activePay===p?'on':'') + '" data-n="' + attr(p) + '" onclick="setPay(this.dataset.n)">' + p + ' <span class="num">' + sums[p].toLocaleString() + '</span></span>';
+  }).join('');
+}
+
+function setPay(p){ activePay = activePay === p ? 'all' : p; renderPayChips(); renderExpenseList(); }
+
 function expenseRowHtml(e){
-  var isFixed = e.cat === '고정비';
-  var label = isFixed ? e.sub : e.cat;
-  var idx = isFixed ? D.cats.fixed.indexOf(e.sub) : D.cats.variable.indexOf(e.cat);
-  if(idx < 0) idx = 0;
-  var color = catColor(label, isFixed, idx);
   var d = e.date.split('-');
   return '<div class="row">' +
-    '<span class="cat-dot" style="background:' + color + ';"></span>' +
+    '<span class="cat-dot" style="background:' + catColor(e.cat) + ';"></span>' +
     '<span class="date num">' + Number(d[1]) + '/' + Number(d[2]) + '</span>' +
     '<span class="name">' + escapeHtml(e.name) + '</span>' +
     '<span class="amt num">' + fmtWon(e.amount) + '</span>' +
@@ -686,19 +815,21 @@ function renderExpenseList(){
     return;
   }
 
-  // "전체": 지출 + 수입을 날짜순으로 섞어서 보여줌 (합계는 안 보여줌 — 이미 예산 카드에 표시됨)
-  // 특정 카테고리 칩: 그 카테고리 지출만 (수입은 카테고리가 없어서 여기엔 안 나옴) — 그 카테고리 합계를 보여줌
+  // "전체"(결제수단 필터 없음): 지출 + 수입을 날짜순으로 섞어서 보여줌 (합계는 안 보여줌 — 이미 예산 카드에 표시됨)
+  // 카테고리나 결제수단 필터가 켜져 있으면: 조건에 맞는 지출만 (수입은 카테고리/결제수단이 없어서 제외) — 그 합계를 보여줌
+  var filtered = activeFilter !== 'all' || activePay !== 'all';
   var filteredExpenses = expensesForMonth(viewMonth).filter(function(e){
-    if(activeFilter === 'all') return true;
-    return e.cat === activeFilter;
+    if(activeFilter !== 'all' && e.cat !== activeFilter) return false;
+    if(activePay !== 'all' && (e.pay || '미지정') !== activePay) return false;
+    return true;
   });
   var expenseRows = filteredExpenses.map(function(e){ return { date: e.date, id: e.id, html: expenseRowHtml(e) }; });
 
-  var incomeRows = activeFilter === 'all'
-    ? incomeForMonth(viewMonth).map(function(e){ return { date: e.date, id: e.id, html: incomeRowHtml(e) }; })
-    : [];
+  var incomeRows = filtered
+    ? []
+    : incomeForMonth(viewMonth).map(function(e){ return { date: e.date, id: e.id, html: incomeRowHtml(e) }; });
 
-  if(activeFilter === 'all'){
+  if(!filtered){
     sumEl.innerHTML = '';
   } else {
     var catSum = filteredExpenses.reduce(function(s,e){ return s + Number(e.amount||0); }, 0);
@@ -710,40 +841,31 @@ function renderExpenseList(){
   el.innerHTML = rows.length ? rows.map(function(r){ return r.html; }).join('') : '<div class="list-empty">해당하는 내역이 없어요</div>';
 }
 
-function escapeHtml(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
-
 function tryDeleteExpense(id){
+  if(!canEdit()) return;
   var e = D.expenses.find(function(x){ return x.id === id; });
   if(!e) return;
-  if(confirm(escapeHtml(e.name) + ' (' + fmtWon(e.amount) + ') 삭제할까요?')){
-    D.expenses = D.expenses.filter(function(x){ return x.id !== id; });
-    save();
-    renderAll();
-    if(gasUrl()) pushToGas(true);
-  }
+  if(confirm(e.name + ' (' + fmtWon(e.amount) + ') 삭제할까요?')) commit({ t:'exDel', id:id });
 }
 
 function tryDeleteIncome(id){
+  if(!canEdit()) return;
   var e = D.income.find(function(x){ return x.id === id; });
   if(!e) return;
-  if(confirm(escapeHtml(e.name || '수입') + ' (+' + fmtWon(e.amount) + ') 삭제할까요?')){
-    D.income = D.income.filter(function(x){ return x.id !== id; });
-    save();
-    renderAll();
-    if(gasUrl()) pushToGas(true);
-  }
+  if(confirm((e.name || '수입') + ' (+' + fmtWon(e.amount) + ') 삭제할까요?')) commit({ t:'inDel', id:id });
 }
 
 // ── 지출/수입 추가 시트 ──────────────────────────────────────────────────
 function openAddSheet(){
+  if(!canEdit()) return;
   editingId = null;
   document.getElementById('fDate').value = todayStr();
   document.getElementById('fAmount').value = '';
   document.getElementById('fName').value = '';
   selectedCat = null;
-  selectedSub = null;
-  renderVarChips();
-  renderFixedChips();
+  selectedPay = localStorage.getItem(LAST_PAY_KEY) || PAYS[0];
+  renderCatChips();
+  renderPayPicker();
   document.getElementById('modeToggle').style.display = 'flex';
   setEntryMode('expense');
   document.getElementById('addOverlay').classList.add('open');
@@ -751,6 +873,7 @@ function openAddSheet(){
 function closeAddSheet(){ document.getElementById('addOverlay').classList.remove('open'); editingId = null; }
 
 function openEditExpense(id){
+  if(!canEdit()) return;
   var e = D.expenses.find(function(x){ return x.id === id; });
   if(!e) return;
   editingId = id;
@@ -758,16 +881,16 @@ function openEditExpense(id){
   document.getElementById('fAmount').value = Number(e.amount).toLocaleString();
   document.getElementById('fName').value = e.name;
   selectedCat = e.cat;
-  selectedSub = e.sub || null;
-  renderVarChips();
-  renderFixedChips();
+  selectedPay = e.pay || null;
+  renderCatChips();
+  renderPayPicker();
   document.getElementById('modeToggle').style.display = 'none';
   setEntryMode('expense');
-  document.getElementById('fixedReveal').style.display = (e.cat === '고정비') ? 'flex' : 'none';
   document.getElementById('addOverlay').classList.add('open');
 }
 
 function openEditIncome(id){
+  if(!canEdit()) return;
   var e = D.income.find(function(x){ return x.id === id; });
   if(!e) return;
   editingId = id;
@@ -793,32 +916,26 @@ function setEntryMode(mode){
   document.getElementById('fNameLabel').textContent = isIncome ? '출처 (선택)' : '항목명';
   document.getElementById('fName').placeholder = isIncome ? '예: 캐시워크, 오늘의집 적립' : '예: 이마트 장보기';
   document.getElementById('catField').style.display = isIncome ? 'none' : 'flex';
-  document.getElementById('fixedReveal').style.display = (!isIncome && selectedCat === '고정비') ? 'flex' : 'none';
+  document.getElementById('payField').style.display = isIncome ? 'none' : 'flex';
   document.getElementById('incomeHint').style.display = isIncome ? 'block' : 'none';
 }
 
-function renderVarChips(){
-  var el = document.getElementById('varChipRow');
-  var chips = D.cats.variable.map(function(c){
-    return '<span class="chip ' + (selectedCat===c?'on':'') + '" onclick="pickCat(\'' + c + '\')">' + c + '</span>';
-  });
-  chips.push('<span class="chip dashed ' + (selectedCat==='고정비'?'on fixed-on':'') + '" onclick="pickCat(\'고정비\')">고정비</span>');
-  el.innerHTML = chips.join('');
-}
-function renderFixedChips(){
-  var el = document.getElementById('fixedChipRow');
-  el.innerHTML = D.cats.fixed.map(function(c){
-    return '<span class="chip ' + (selectedSub===c?'on fixed-on':'') + '" onclick="pickSub(\'' + c + '\')">' + c + '</span>';
+// 수정 중인 지출의 카테고리가 목록에서 삭제된 이름이어도 선택된 채로 보이게 함
+function renderCatChips(){
+  var names = D.cats.list.slice();
+  if(selectedCat && names.indexOf(selectedCat) < 0) names.push(selectedCat);
+  document.getElementById('varChipRow').innerHTML = names.map(function(c){
+    return '<span class="chip ' + (selectedCat===c?'on':'') + '" data-n="' + attr(c) + '" onclick="pickCat(this.dataset.n)">' + escapeHtml(c) + '</span>';
   }).join('');
 }
-function pickCat(c){
-  selectedCat = c;
-  selectedSub = null;
-  renderVarChips();
-  renderFixedChips();
-  document.getElementById('fixedReveal').style.display = (c === '고정비') ? 'flex' : 'none';
+function pickCat(c){ selectedCat = c; renderCatChips(); }
+
+function renderPayPicker(){
+  document.getElementById('payChipRow').innerHTML = PAYS.map(function(p){
+    return '<span class="chip ' + (selectedPay===p?'on':'') + '" data-n="' + attr(p) + '" onclick="pickPay(this.dataset.n)">' + p + '</span>';
+  }).join('');
 }
-function pickSub(c){ selectedSub = c; renderFixedChips(); }
+function pickPay(p){ selectedPay = p; renderPayPicker(); }
 
 function saveEntry(){
   var date = document.getElementById('fDate').value;
@@ -828,86 +945,81 @@ function saveEntry(){
   if(!date){ alert('날짜를 선택해주세요'); return; }
   if(!amount || amount <= 0){ alert('금액을 입력해주세요'); return; }
 
+  var op;
   if(entryMode === 'income'){
-    if(editingId){
-      var incomeEntry = D.income.find(function(x){ return x.id === editingId; });
-      if(incomeEntry){ incomeEntry.date = date; incomeEntry.amount = amount; incomeEntry.name = name; }
-    } else {
-      D.income.push({ id: uid(), date: date, amount: amount, name: name });
-    }
+    op = { t:'in', item:{ id: editingId || uid(), date: date, amount: amount, name: name } };
   } else {
     if(!name){ alert('항목명을 입력해주세요'); return; }
     if(!selectedCat){ alert('카테고리를 선택해주세요'); return; }
-    if(selectedCat === '고정비' && !selectedSub){ alert('고정비 세부카테고리를 선택해주세요'); return; }
-    if(editingId){
-      var expenseEntry = D.expenses.find(function(x){ return x.id === editingId; });
-      if(expenseEntry){
-        expenseEntry.date = date; expenseEntry.amount = amount; expenseEntry.name = name;
-        expenseEntry.cat = selectedCat; expenseEntry.sub = selectedSub || '';
-      }
-    } else {
-      D.expenses.push({ id: uid(), date: date, amount: amount, name: name, cat: selectedCat, sub: selectedSub || '' });
-    }
+    // 결제수단이 비어 있는 옛 지출은 수정할 때 비워둔 채로 저장해도 됨
+    if(!selectedPay && !editingId){ alert('결제수단을 선택해주세요'); return; }
+    op = { t:'ex', item:{ id: editingId || uid(), date: date, amount: amount, name: name, cat: selectedCat, sub: '', pay: selectedPay || '' } };
   }
 
-  save();
-  closeAddSheet();
   viewMonth = date.slice(0,7);
-  renderAll();
-  if(gasUrl()) pushToGas(true); // 저장 직후 바로 구글시트까지 반영 (사용자가 명시적으로 요청한 동작)
+  if(!commit(op)) return;
+  if(op.t === 'ex' && selectedPay) localStorage.setItem(LAST_PAY_KEY, selectedPay);
+  closeAddSheet();
 }
 
 // ── 설정 시트 ───────────────────────────────────────────────────────────
 function openSettings(){
-  document.getElementById('budgetTitle').textContent = monthLabel(viewMonth) + ' 예산';
-  document.getElementById('fBudget').value = D.budgets[viewMonth] || '';
+  document.getElementById('budgetTitle').textContent = monthLabel(viewMonth) + ' 입금';
+  var dep = D.deposits[viewMonth] || {};
+  document.getElementById('fDepYj').value = dep.yj || '';
+  document.getElementById('fDepJh').value = dep.jh || '';
+  var legacy = D.budgets[viewMonth] && !D.deposits[viewMonth];
+  document.getElementById('depHint').textContent = legacy
+    ? ('예전에 입력한 예산 ' + D.budgets[viewMonth].toLocaleString() + '원이 적용 중이에요. 입금액을 입력하면 두 사람 합계로 바뀌어요')
+    : '두 사람 입금액의 합이 이번 달 예산이에요 (보고 있는 달 기준)';
   document.getElementById('fGasUrl').value = gasUrl();
+  document.getElementById('fGasKey').value = gasKey();
   renderSyncStatus();
   renderCatSettingsLists();
   document.getElementById('settingsOverlay').classList.add('open');
 }
 function closeSettings(){ document.getElementById('settingsOverlay').classList.remove('open'); renderAll(); }
 
-function saveBudget(){
-  var v = Number(document.getElementById('fBudget').value) || 0;
-  D.budgets[viewMonth] = v;
-  save();
+function saveDeposit(){
+  var yj = Number(document.getElementById('fDepYj').value) || 0;
+  var jh = Number(document.getElementById('fDepJh').value) || 0;
+  commit({ t:'dep', ym:viewMonth, yj:yj, jh:jh });
 }
 
 function renderCatSettingsLists(){
-  var varEl = document.getElementById('varCatList');
-  varEl.innerHTML = D.cats.variable.map(function(c,i){
-    return '<div class="setting-row"><span class="name"><span class="dot" style="background:' + catColor(c,false,i) + ';"></span>' + escapeHtml(c) + '</span><span class="del" onclick="removeCategory(\'variable\',\'' + c + '\')">삭제</span></div>';
-  }).join('');
-
-  var fixedEl = document.getElementById('fixedCatList');
-  fixedEl.innerHTML = D.cats.fixed.map(function(c,i){
-    return '<div class="setting-row"><span class="name"><span class="dot" style="background:' + catColor(c,true,i) + ';"></span>' + escapeHtml(c) + '</span><span class="del" onclick="removeCategory(\'fixed\',\'' + c + '\')">삭제</span></div>';
+  document.getElementById('catList').innerHTML = D.cats.list.map(function(c){
+    return '<div class="setting-row"><span class="name"><span class="dot" style="background:' + catColor(c) + ';"></span>' + escapeHtml(c) + '</span><span class="del" data-n="' + attr(c) + '" onclick="removeCategory(this.dataset.n)">삭제</span></div>';
   }).join('');
 }
 
-function addCategory(kind){
-  var name = prompt(kind === 'variable' ? '추가할 변동비 카테고리 이름' : '추가할 고정비 세부카테고리 이름');
+function addCategory(){
+  var name = prompt('추가할 카테고리 이름');
   if(!name) return;
   name = name.trim();
   if(!name) return;
-  var arr = D.cats[kind];
-  if(arr.indexOf(name) >= 0){ alert('이미 있는 이름이에요'); return; }
-  arr.push(name);
-  save();
-  renderCatSettingsLists();
+  if(D.cats.list.indexOf(name) >= 0){ alert('이미 있는 이름이에요'); return; }
+  if(commit({ t:'catAdd', name:name })) renderCatSettingsLists();
 }
 
-function removeCategory(kind, name){
+function removeCategory(name){
   if(!confirm('"' + name + '" 카테고리를 삭제할까요? (기존 지출 기록은 유지돼요)')) return;
-  D.cats[kind] = D.cats[kind].filter(function(c){ return c !== name; });
-  save();
-  renderCatSettingsLists();
+  if(commit({ t:'catDel', name:name })) renderCatSettingsLists();
 }
 
 // ── 초기화 ──────────────────────────────────────────────────────────────
 renderAll();
-if(gasUrl()) loadFromGas(false, true);
+if(gasUrl()){
+  setSyncIndicator('<span class="dot"></span>동기화 확인 중...');
+  pull().then(function(){ setSyncIndicator('최신 상태예요', true); })
+    .catch(function(e){ setSyncIndicator(syncErrorText(e), true); });
+}
+
+// 앱을 열어둔 채 한참 뒤 다시 화면으로 돌아오면 상대의 새 내역을 받아옴 (오래된 화면에서 저장하는 일 방지)
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState !== 'visible' || !gasUrl()) return;
+  if(pending.length){ flush(); return; }
+  if(Date.now() - lastPullAt > 15000) pull().catch(function(){});
+});
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(function(){});

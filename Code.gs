@@ -2,78 +2,130 @@
 // 생활비 가계부 GAS 백엔드
 // 배포: 웹 앱 / 다음 사용자로 실행: 나 / 액세스: 모든 사람 (익명 포함)
 // 배포 후 index.html의 DEFAULT_GAS_URL에 배포 URL을 붙여넣을 것
+//
+// 공유 키: 프로젝트 설정 > 스크립트 속성에 LC_KEY를 추가하면, 그 값이 맞는 요청만 처리함
+// (이 파일은 공개 저장소에 올라가므로 키를 코드에 직접 적지 말 것)
 // ─────────────────────────────────────────────────────────────────────────
 
 const SH = {
   EXPENSES : 'Expenses',
   INCOME   : 'Income',
   BUDGETS  : 'Budgets',
-  CATS_VAR : 'Categories_Variable',
-  CATS_FIX : 'Categories_Fixed',
+  DEPOSITS : 'Deposits',
+  CATS     : 'Categories',
+  CATS_VAR : 'Categories_Variable', // 예전 구조, 이전 데이터를 읽어서 옮길 때만 사용
+  CATS_FIX : 'Categories_Fixed',    // 예전 구조, 이전 데이터를 읽어서 옮길 때만 사용
   SETTINGS : 'Settings'
 }
 
-const EXPENSE_COLS = ['id','date','amount','name','cat','sub']
+// sub는 예전 고정비 세부카테고리 열이라 값은 항상 비어 있음 (열 위치를 유지하려고 남겨둠)
+const EXPENSE_COLS = ['id','date','amount','name','cat','sub','pay']
 const INCOME_COLS = ['id','date','amount','name']
+const DEPOSIT_COLS = ['month','yj','jh']
+
+// 한 번의 업로드로 행 수가 이 비율 미만으로 줄면 오류로 보고 거부함 (빈 데이터로 덮어쓰는 사고 방지)
+const SHRINK_MIN_ROWS = 10
+const SHRINK_RATIO = 0.5
 
 // ── 진입점 ────────────────────────────────────────────────────────────────
 
 function doGet(e) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet()
-    const D = {
-      expenses: readRows(ss, SH.EXPENSES, EXPENSE_COLS).map(function(r){
-        r.amount = Number(r.amount) || 0
-        return r
-      }),
-      income: readRows(ss, SH.INCOME, INCOME_COLS).map(function(r){
-        r.amount = Number(r.amount) || 0
-        return r
-      }),
-      budgets: readBudgets(ss),
-      cats: {
-        variable: readSimpleList(ss, SH.CATS_VAR),
-        fixed: readSimpleList(ss, SH.CATS_FIX)
-      },
-      _savedAt: readSavedAt(ss)
-    }
-    return ContentService.createTextOutput(JSON.stringify(D))
-      .setMimeType(ContentService.MimeType.JSON)
+    if (!authorized(e && e.parameter && e.parameter.key)) return json({ error: 'unauthorized' })
+    return withLock(function() {
+      const ss = SpreadsheetApp.getActiveSpreadsheet()
+      return json({
+        expenses: readRows(ss, SH.EXPENSES, EXPENSE_COLS).map(function(r){
+          r.amount = Number(r.amount) || 0
+          return r
+        }),
+        income: readRows(ss, SH.INCOME, INCOME_COLS).map(function(r){
+          r.amount = Number(r.amount) || 0
+          return r
+        }),
+        budgets: readBudgets(ss),
+        deposits: readDeposits(ss),
+        cats: {
+          list: readSimpleList(ss, SH.CATS),
+          variable: readSimpleList(ss, SH.CATS_VAR),
+          fixed: readSimpleList(ss, SH.CATS_FIX)
+        },
+        _savedAt: readSavedAt(ss)
+      })
+    })
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ error: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON)
+    return json({ error: err.toString() })
   }
 }
 
 function doPost(e) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet()
     const D = JSON.parse(e.postData.contents)
+    if (!authorized(D._key)) return json({ ok: false, error: 'unauthorized' })
 
-    writeRows(ss, SH.EXPENSES, D.expenses || [], EXPENSE_COLS, ['date'])
-    writeRows(ss, SH.INCOME, D.income || [], INCOME_COLS, ['date'])
-    writeBudgets(ss, D.budgets || {})
-    writeSimpleList(ss, SH.CATS_VAR, (D.cats && D.cats.variable) || [])
-    writeSimpleList(ss, SH.CATS_FIX, (D.cats && D.cats.fixed) || [])
-    writeSavedAt(ss, D._savedAt || Date.now())
+    return withLock(function() {
+      const ss = SpreadsheetApp.getActiveSpreadsheet()
+      const expenses = D.expenses || []
+      const income = D.income || []
 
-    return ContentService.createTextOutput(JSON.stringify({ ok: true }))
-      .setMimeType(ContentService.MimeType.JSON)
+      if (shrinks(rowCount(ss, SH.EXPENSES), expenses.length) || shrinks(rowCount(ss, SH.INCOME), income.length)) {
+        return json({ ok: false, error: 'shrink' })
+      }
+
+      writeRows(ss, SH.EXPENSES, expenses, EXPENSE_COLS, ['date'])
+      writeRows(ss, SH.INCOME, income, INCOME_COLS, ['date'])
+      writeBudgets(ss, D.budgets || {})
+      writeDeposits(ss, D.deposits || {})
+      writeSimpleList(ss, SH.CATS, (D.cats && D.cats.list) || [])
+      writeSavedAt(ss, D._savedAt || Date.now())
+
+      return json({ ok: true })
+    })
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON)
+    return json({ ok: false, error: err.toString() })
   }
 }
 
 // ── 공통 헬퍼 ─────────────────────────────────────────────────────────────
 
+function json(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON)
+}
+
+// LC_KEY가 설정돼 있으면 일치하는 요청만 통과시킴 (설정 전에는 막지 않음)
+function authorized(key) {
+  const expected = PropertiesService.getScriptProperties().getProperty('LC_KEY')
+  return !expected || key === expected
+}
+
+// 읽기/쓰기가 동시에 시트를 건드리지 않게 직렬화함 (쓰기는 시트를 비운 뒤 다시 채우므로, 그 사이에 읽으면 빈 데이터가 나감)
+function withLock(fn) {
+  const lock = LockService.getScriptLock()
+  lock.waitLock(25000)
+  try { return fn() } finally { lock.releaseLock() }
+}
+
+function rowCount(ss, name) {
+  const sh = ss.getSheetByName(name)
+  return sh ? Math.max(0, sh.getLastRow() - 1) : 0
+}
+
+function shrinks(before, after) {
+  return before >= SHRINK_MIN_ROWS && after < before * SHRINK_RATIO
+}
+
 function getOrCreate(ss, name, headers) {
   let sh = ss.getSheetByName(name)
   if (!sh) {
     sh = ss.insertSheet(name)
+    sh.setFrozenRows(1)
+  }
+  // 열이 추가된 경우(예: pay) 기존 시트의 머리글도 맞춰줌
+  const cur = sh.getRange(1, 1, 1, headers.length).getValues()[0]
+  if (cur.join('|') !== headers.join('|')) {
     sh.getRange(1, 1, 1, headers.length).setValues([headers])
       .setFontWeight('bold').setBackground('#E8F0FE')
-    sh.setFrozenRows(1)
   }
   return sh
 }
@@ -125,6 +177,23 @@ function readBudgets(ss) {
 function writeBudgets(ss, budgets) {
   const rows = Object.keys(budgets).map(function(m) { return { month: m, amount: budgets[m] } })
   writeRows(ss, SH.BUDGETS, rows, ['month', 'amount'], ['month'])
+}
+
+// ── Deposits 시트 (month, yj, jh) — 공통통장에 매달 입금하는 금액 ─────────────
+
+function readDeposits(ss) {
+  const out = {}
+  readRows(ss, SH.DEPOSITS, DEPOSIT_COLS).forEach(function(r) {
+    out[String(r.month)] = { yj: Number(r.yj) || 0, jh: Number(r.jh) || 0 }
+  })
+  return out
+}
+
+function writeDeposits(ss, deposits) {
+  const rows = Object.keys(deposits).map(function(m) {
+    return { month: m, yj: deposits[m].yj, jh: deposits[m].jh }
+  })
+  writeRows(ss, SH.DEPOSITS, rows, DEPOSIT_COLS, ['month'])
 }
 
 // ── Categories 시트 (name 한 컬럼짜리 단순 리스트) ─────────────────────────
