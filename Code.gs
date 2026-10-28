@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 // 앱이 이 값을 확인해서, 서버가 옛 버전이면 올리지 않고 변경을 기기에 보관함 (새 필드가 조용히 버려지는 사고 방지)
-const SCHEMA = 3
+const SCHEMA = 4
 
 const SH = {
   EXPENSES : 'Expenses',
@@ -22,6 +22,7 @@ const SH = {
   LEDGER_EXP  : 'Ledger_Expenses',   // 예진/재하/경조사 장부의 지출 (ledger 열로 구분)
   LEDGER_INC  : 'Ledger_Income',
   LEDGER_CATS : 'Ledger_Categories',
+  LEDGER_CARDS: 'Ledger_Cards',      // 예진/재하가 등록한 신용카드 (실적 기준액 포함)
   EVENT       : 'Event'              // 경조사통장 설정 (key, value)
 }
 
@@ -31,9 +32,11 @@ const LEDGERS = ['yj', 'jh', 'event']
 const EXPENSE_COLS = ['id','date','amount','name','cat','sub','pay']
 const INCOME_COLS = ['id','date','amount','name']
 const DEPOSIT_COLS = ['month','yj','jh']
-const LEDGER_EXP_COLS = ['ledger','id','date','amount','name','cat']
+// pay/card는 schema 4에서 맨 뒤에 추가 (기존 열 위치 유지). 경조사 장부는 결제수단이 없어 비어 있음
+const LEDGER_EXP_COLS = ['ledger','id','date','amount','name','cat','pay','card']
 const LEDGER_INC_COLS = ['ledger','id','date','amount','name']
 const LEDGER_CAT_COLS = ['ledger','name']
+const LEDGER_CARD_COLS = ['ledger','id','name','target']
 
 // 한 번의 업로드로 행 수가 이 비율 미만으로 줄면 오류로 보고 거부함 (빈 데이터로 덮어쓰는 사고 방지)
 const SHRINK_MIN_ROWS = 10
@@ -96,9 +99,11 @@ function doPost(e) {
       writeDeposits(ss, D.deposits || {})
       writeSimpleList(ss, SH.CATS, (D.cats && D.cats.list) || [])
       if (flat) {
+        keepPayFromOldClients(ss, flat.exp)
         writeRows(ss, SH.LEDGER_EXP, flat.exp, LEDGER_EXP_COLS, ['date'])
         writeRows(ss, SH.LEDGER_INC, flat.inc, LEDGER_INC_COLS, ['date'])
         writeRows(ss, SH.LEDGER_CATS, flat.cats, LEDGER_CAT_COLS)
+        writeRows(ss, SH.LEDGER_CARDS, flat.cards, LEDGER_CARD_COLS)
       }
       if (D.eventCfg) writeEvent(ss, D.eventCfg)
       writeSavedAt(ss, D._savedAt || Date.now())
@@ -224,12 +229,12 @@ function writeDeposits(ss, deposits) {
 
 function readLedgers(ss) {
   const out = {}
-  LEDGERS.forEach(function(l) { out[l] = { expenses: [], income: [], cats: [] } })
+  LEDGERS.forEach(function(l) { out[l] = { expenses: [], income: [], cats: [], cards: [] } })
 
   readRows(ss, SH.LEDGER_EXP, LEDGER_EXP_COLS).forEach(function(r) {
     const l = String(r.ledger)
     if (!out[l]) return
-    out[l].expenses.push({ id: r.id, date: r.date, amount: Number(r.amount) || 0, name: r.name, cat: r.cat })
+    out[l].expenses.push({ id: r.id, date: r.date, amount: Number(r.amount) || 0, name: r.name, cat: r.cat, pay: String(r.pay || ''), card: String(r.card || '') })
   })
   readRows(ss, SH.LEDGER_INC, LEDGER_INC_COLS).forEach(function(r) {
     const l = String(r.ledger)
@@ -240,18 +245,36 @@ function readLedgers(ss) {
     const l = String(r.ledger)
     if (out[l]) out[l].cats.push(String(r.name))
   })
+  readRows(ss, SH.LEDGER_CARDS, LEDGER_CARD_COLS).forEach(function(r) {
+    const l = String(r.ledger)
+    if (out[l]) out[l].cards.push({ id: String(r.id), name: String(r.name), target: Number(r.target) || 0 })
+  })
   return out
 }
 
+// 옛 화면(schema 3)은 pay/card를 몰라서, 거기서 수정한 지출은 이 필드가 아예 없이 올라옴.
+// 그대로 쓰면 결제수단이 지워지므로, 필드가 없는 지출은 시트에 있던 값을 유지함 (새 화면은 결제수단이 없어도 빈 값을 보냄)
+function keepPayFromOldClients(ss, rows) {
+  const prev = {}
+  readRows(ss, SH.LEDGER_EXP, LEDGER_EXP_COLS).forEach(function(r) { prev[r.ledger + '|' + r.id] = r })
+  rows.forEach(function(e) {
+    const p = prev[e.ledger + '|' + e.id]
+    if (!p || 'pay' in e) return
+    e.pay = p.pay
+    e.card = p.card
+  })
+}
+
 function flatLedgers(ledgers) {
-  const exp = [], inc = [], cats = []
+  const exp = [], inc = [], cats = [], cards = []
   LEDGERS.forEach(function(l) {
     const b = ledgers[l] || {}
     ;(b.expenses || []).forEach(function(e) { exp.push(Object.assign({}, e, { ledger: l })) })
     ;(b.income || []).forEach(function(e) { inc.push(Object.assign({}, e, { ledger: l })) })
     ;(b.cats || []).forEach(function(name) { cats.push({ ledger: l, name: name }) })
+    ;(b.cards || []).forEach(function(c) { cards.push(Object.assign({}, c, { ledger: l })) })
   })
-  return { exp: exp, inc: inc, cats: cats }
+  return { exp: exp, inc: inc, cats: cats, cards: cards }
 }
 
 // ── Event 시트 (경조사통장 설정: 목표 금액, 각자 월 입금액, 실제 잔액으로 맞춘 기준일/기준 잔액) ──
