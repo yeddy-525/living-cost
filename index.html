@@ -191,6 +191,8 @@
   }
   .btn-primary:hover{ background:var(--accent-ink); }
   .btn-primary:active{ transform:scale(.98); }
+  /* 지출 시트 저장 버튼: 크게 + 시트가 스크롤돼도 하단에 붙어 있음. 그림자는 뒤로 지나가는 칩을 가리는 용도 */
+  .btn-save{ position:sticky; bottom:0; height:52px; font-size:15px; flex:none; box-shadow:0 0 0 10px var(--surface); }
 
   .settings-sec{ display:flex; flex-direction:column; gap:9px; }
   .settings-sec .title{ font-size:12px; font-weight:700; }
@@ -368,7 +370,7 @@
     </div>
     <div class="hint" id="incomeHint" style="display:none;"></div>
 
-    <button class="btn-primary" onclick="saveEntry()">저장</button>
+    <button class="btn-primary btn-save" onclick="saveEntry()">저장</button>
   </div>
 </div>
 
@@ -389,8 +391,13 @@ var SCHEMA_REQUIRED = 3;
 
 var COLOR_COUNT = 16; // --cc1..--cc16
 // 공통통장 기본 카테고리. 경조사·선물은 경조사통장에서 나가므로 넣지 않음
-var DEFAULT_CATS = ['주거','공과금','식비','생필품','의류·취미','교통비','구독료','폰요금','보험','의료비','저축','기타'];
-var PERSONAL_CATS = ['용돈','식비','교통비','쇼핑·취미','구독료','폰요금','보험','의료비','투자','저축','기타'];
+// 새로 설치할 때만 쓰는 기본 목록. 이미 쓰는 기기는 설정에서 추가·삭제한 목록이 그대로 유지됨
+var DEFAULT_CATS = ['월세','이자','관리비','전기세','가스비','물 세','인터넷','식비','커피','생필품','교통비','구독료','폰요금','보험','의료비','저축','기타'];
+var PERSONAL_CATS = ['용돈','식비','커피','교통비','의류','취미','구독료','폰요금','보험','의료비','투자','저축','기타'];
+// 지출 시트에 바로 보이는 카테고리 (장부별). 나머지는 "더보기"를 눌러야 나옴. 목록에 없는 장부(경조사)는 전부 보임 (2026-10-28 확정)
+var MAIN_CATS = { common:['식비','커피','생필품'], yj:['식비','커피','교통비','의류','취미'], jh:['식비','커피','교통비','의류','취미'] };
+// 도넛에서만 한 조각으로 합쳐 보여주는 카테고리. 입력·리스트·필터는 각각 따로 — 매달 냈는지 필터로 확인하려고 (2026-10-28 확정)
+var DONUT_GROUP = { '전기세':'공과금', '가스비':'공과금', '물 세':'공과금', '인터넷':'공과금', '구독료':'고정비', '폰요금':'고정비', '보험':'고정비' };
 var EVENT_CATS = ['경조사','선물','기타'];
 // 예전 카테고리를 새 목록으로 옮길 때의 이름 변환. 여기에 없는 이름(예: 데이트)은 그대로 목록에 추가됨
 var CAT_RENAME = { '월세':'주거', '관리비':'주거', '교통':'교통비', '기타고정비':'기타' };
@@ -410,6 +417,7 @@ var activePay = 'all';
 var entryMode = 'expense';
 var editingId = null; // null이면 새 항목 추가, 값이 있으면 해당 id의 항목을 수정 중
 var selectedCat = null;
+var catsExpanded = false; // 지출 시트에서 "더보기"를 눌렀는지. 시트를 새로 열 때 접힘
 var selectedPay = null;
 var settingsCatLedger = 'common';
 var lastPullAt = 0;
@@ -959,11 +967,15 @@ function catColor(name, list){
 function categoryBreakdown(){
   var list = ledgerExpenses(viewMonth);
   var total = sumAmount(list);
-  var buckets = {};
-  list.forEach(function(e){ buckets[e.cat] = (buckets[e.cat] || 0) + Number(e.amount||0); });
+  var buckets = {}, colorOf = {};
+  list.forEach(function(e){
+    var label = DONUT_GROUP[e.cat] || e.cat;
+    buckets[label] = (buckets[label] || 0) + Number(e.amount||0);
+    if(!colorOf[label]) colorOf[label] = e.cat; // 묶음(공과금/고정비)은 처음 나온 하위 카테고리 색을 씀
+  });
 
   var rows = Object.keys(buckets).map(function(label){
-    return { label:label, amount:buckets[label], pct: total ? Math.round(buckets[label]/total*100) : 0, color: catColor(label) };
+    return { label:label, amount:buckets[label], pct: total ? Math.round(buckets[label]/total*100) : 0, color: catColor(colorOf[label]) };
   }).sort(function(a,b){ return b.amount - a.amount; });
 
   return { total:total, rows:rows };
@@ -1107,6 +1119,7 @@ function openAddSheet(){
   el('fAmount').value = '';
   el('fName').value = '';
   selectedCat = null;
+  catsExpanded = false;
   selectedPay = localStorage.getItem(LAST_PAY_KEY) || PAYS[0];
   renderCatChips();
   renderPayPicker();
@@ -1125,6 +1138,7 @@ function openEditExpense(id){
   el('fAmount').value = Number(e.amount).toLocaleString();
   el('fName').value = e.name;
   selectedCat = e.cat;
+  catsExpanded = false;
   selectedPay = e.pay || null;
   renderCatChips();
   renderPayPicker();
@@ -1171,12 +1185,19 @@ function setEntryMode(mode){
 }
 
 // 수정 중인 지출의 카테고리가 목록에서 삭제된 이름이어도 선택된 채로 보이게 함
+// 자주 쓰는 것(MAIN_CATS)만 먼저 보이고, 펼치면 나머지를 뒤에 이어 붙임. 선택된 게 숨김 쪽이면(수정·자동완성) 펼친 채로 보여줌
 function renderCatChips(){
   var names = catList().slice();
   if(selectedCat && names.indexOf(selectedCat) < 0) names.push(selectedCat);
-  el('varChipRow').innerHTML = names.map(function(c){
+  var mainNames = MAIN_CATS[curLedger()] || [];
+  var main = mainNames.filter(function(c){ return names.indexOf(c) >= 0; }); // MAIN_CATS 순서대로 (설정에서 나중에 추가해 목록 끝에 있어도 앞에 옴)
+  var rest = names.filter(function(c){ return mainNames.indexOf(c) < 0; });
+  var open = catsExpanded || !main.length || rest.indexOf(selectedCat) >= 0;
+  var chips = main.concat(open ? rest : []).map(function(c){
     return '<span class="chip ' + (selectedCat===c?'on':'') + '" data-n="' + attr(c) + '" onclick="pickCat(this.dataset.n)">' + escapeHtml(c) + '</span>';
-  }).join('');
+  });
+  if(!open && rest.length) chips.push('<span class="chip dashed" onclick="catsExpanded=true; renderCatChips()">더보기 ▾</span>');
+  el('varChipRow').innerHTML = chips.join('');
 }
 function pickCat(c){ selectedCat = c; renderCatChips(); }
 
